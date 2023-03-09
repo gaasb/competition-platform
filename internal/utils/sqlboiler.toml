@@ -1,0 +1,15 @@
+output = "./utils/boiler-models"
+wipe = true
+pkgname = "model"
+add-enum-types = true
+[psql]
+  dbname = "main"
+  host   = "host.docker.internal"
+  port   = 5432
+  user   = "blank"
+  pass   = "qwerty"
+  sslmode = "disable"
+#  schema = "test"
+#  blacklist = ["migrations", "other"]
+ [auto-columns]
+     created = "created_on"
