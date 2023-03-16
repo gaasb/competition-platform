@@ -494,6 +494,1318 @@ func testTeamsInsertWhitelist(t *testing.T) {
 	}
 }
 
+func testTeamToManyFirstTeamMatches(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, true, teamColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Team struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, matchDBTypes, false, matchColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, matchDBTypes, false, matchColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&b.FirstTeam, a.ID)
+	queries.Assign(&c.FirstTeam, a.ID)
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.FirstTeamMatches().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if queries.Equal(v.FirstTeam, b.FirstTeam) {
+			bFound = true
+		}
+		if queries.Equal(v.FirstTeam, c.FirstTeam) {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := TeamSlice{&a}
+	if err = a.L.LoadFirstTeamMatches(ctx, tx, false, (*[]*Team)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.FirstTeamMatches); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.FirstTeamMatches = nil
+	if err = a.L.LoadFirstTeamMatches(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.FirstTeamMatches); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
+func testTeamToManySecondTeamMatches(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, true, teamColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Team struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, matchDBTypes, false, matchColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, matchDBTypes, false, matchColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&b.SecondTeam, a.ID)
+	queries.Assign(&c.SecondTeam, a.ID)
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.SecondTeamMatches().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if queries.Equal(v.SecondTeam, b.SecondTeam) {
+			bFound = true
+		}
+		if queries.Equal(v.SecondTeam, c.SecondTeam) {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := TeamSlice{&a}
+	if err = a.L.LoadSecondTeamMatches(ctx, tx, false, (*[]*Team)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.SecondTeamMatches); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.SecondTeamMatches = nil
+	if err = a.L.LoadSecondTeamMatches(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.SecondTeamMatches); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
+func testTeamToManyWinnerMatches(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, true, teamColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Team struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, matchDBTypes, false, matchColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, matchDBTypes, false, matchColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&b.Winner, a.ID)
+	queries.Assign(&c.Winner, a.ID)
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.WinnerMatches().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if queries.Equal(v.Winner, b.Winner) {
+			bFound = true
+		}
+		if queries.Equal(v.Winner, c.Winner) {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := TeamSlice{&a}
+	if err = a.L.LoadWinnerMatches(ctx, tx, false, (*[]*Team)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.WinnerMatches); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.WinnerMatches = nil
+	if err = a.L.LoadWinnerMatches(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.WinnerMatches); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
+func testTeamToManyParticipants(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c Participant
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, true, teamColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Team struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, participantDBTypes, false, participantColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, participantDBTypes, false, participantColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&b.TeamID, a.ID)
+	queries.Assign(&c.TeamID, a.ID)
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.Participants().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if queries.Equal(v.TeamID, b.TeamID) {
+			bFound = true
+		}
+		if queries.Equal(v.TeamID, c.TeamID) {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := TeamSlice{&a}
+	if err = a.L.LoadParticipants(ctx, tx, false, (*[]*Team)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Participants); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.Participants = nil
+	if err = a.L.LoadParticipants(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Participants); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
+func testTeamToManyAddOpFirstTeamMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Match{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddFirstTeamMatches(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if !queries.Equal(a.ID, first.FirstTeam) {
+			t.Error("foreign key was wrong value", a.ID, first.FirstTeam)
+		}
+		if !queries.Equal(a.ID, second.FirstTeam) {
+			t.Error("foreign key was wrong value", a.ID, second.FirstTeam)
+		}
+
+		if first.R.FirstTeamTeam != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.FirstTeamTeam != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.FirstTeamMatches[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.FirstTeamMatches[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.FirstTeamMatches().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testTeamToManySetOpFirstTeamMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetFirstTeamMatches(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.FirstTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetFirstTeamMatches(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.FirstTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.FirstTeam) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.FirstTeam) {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if !queries.Equal(a.ID, d.FirstTeam) {
+		t.Error("foreign key was wrong value", a.ID, d.FirstTeam)
+	}
+	if !queries.Equal(a.ID, e.FirstTeam) {
+		t.Error("foreign key was wrong value", a.ID, e.FirstTeam)
+	}
+
+	if b.R.FirstTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.FirstTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.FirstTeamTeam != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.FirstTeamTeam != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.FirstTeamMatches[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.FirstTeamMatches[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testTeamToManyRemoveOpFirstTeamMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddFirstTeamMatches(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.FirstTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveFirstTeamMatches(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.FirstTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.FirstTeam) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.FirstTeam) {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.FirstTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.FirstTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.FirstTeamTeam != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.FirstTeamTeam != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.FirstTeamMatches) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.FirstTeamMatches[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.FirstTeamMatches[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testTeamToManyAddOpSecondTeamMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Match{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddSecondTeamMatches(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if !queries.Equal(a.ID, first.SecondTeam) {
+			t.Error("foreign key was wrong value", a.ID, first.SecondTeam)
+		}
+		if !queries.Equal(a.ID, second.SecondTeam) {
+			t.Error("foreign key was wrong value", a.ID, second.SecondTeam)
+		}
+
+		if first.R.SecondTeamTeam != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.SecondTeamTeam != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.SecondTeamMatches[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.SecondTeamMatches[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.SecondTeamMatches().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testTeamToManySetOpSecondTeamMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetSecondTeamMatches(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.SecondTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetSecondTeamMatches(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.SecondTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.SecondTeam) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.SecondTeam) {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if !queries.Equal(a.ID, d.SecondTeam) {
+		t.Error("foreign key was wrong value", a.ID, d.SecondTeam)
+	}
+	if !queries.Equal(a.ID, e.SecondTeam) {
+		t.Error("foreign key was wrong value", a.ID, e.SecondTeam)
+	}
+
+	if b.R.SecondTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.SecondTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.SecondTeamTeam != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.SecondTeamTeam != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.SecondTeamMatches[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.SecondTeamMatches[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testTeamToManyRemoveOpSecondTeamMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddSecondTeamMatches(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.SecondTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveSecondTeamMatches(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.SecondTeamMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.SecondTeam) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.SecondTeam) {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.SecondTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.SecondTeamTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.SecondTeamTeam != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.SecondTeamTeam != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.SecondTeamMatches) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.SecondTeamMatches[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.SecondTeamMatches[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testTeamToManyAddOpWinnerMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Match{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddWinnerMatches(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if !queries.Equal(a.ID, first.Winner) {
+			t.Error("foreign key was wrong value", a.ID, first.Winner)
+		}
+		if !queries.Equal(a.ID, second.Winner) {
+			t.Error("foreign key was wrong value", a.ID, second.Winner)
+		}
+
+		if first.R.WinnerTeam != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.WinnerTeam != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.WinnerMatches[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.WinnerMatches[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.WinnerMatches().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testTeamToManySetOpWinnerMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetWinnerMatches(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.WinnerMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetWinnerMatches(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.WinnerMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.Winner) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.Winner) {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if !queries.Equal(a.ID, d.Winner) {
+		t.Error("foreign key was wrong value", a.ID, d.Winner)
+	}
+	if !queries.Equal(a.ID, e.Winner) {
+		t.Error("foreign key was wrong value", a.ID, e.Winner)
+	}
+
+	if b.R.WinnerTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.WinnerTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.WinnerTeam != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.WinnerTeam != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.WinnerMatches[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.WinnerMatches[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testTeamToManyRemoveOpWinnerMatches(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Match
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Match{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, matchDBTypes, false, strmangle.SetComplement(matchPrimaryKeyColumns, matchColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddWinnerMatches(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.WinnerMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveWinnerMatches(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.WinnerMatches().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.Winner) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.Winner) {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.WinnerTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.WinnerTeam != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.WinnerTeam != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.WinnerTeam != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.WinnerMatches) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.WinnerMatches[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.WinnerMatches[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testTeamToManyAddOpParticipants(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Participant
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Participant{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, participantDBTypes, false, strmangle.SetComplement(participantPrimaryKeyColumns, participantColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Participant{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddParticipants(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if !queries.Equal(a.ID, first.TeamID) {
+			t.Error("foreign key was wrong value", a.ID, first.TeamID)
+		}
+		if !queries.Equal(a.ID, second.TeamID) {
+			t.Error("foreign key was wrong value", a.ID, second.TeamID)
+		}
+
+		if first.R.Team != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.Team != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.Participants[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.Participants[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.Participants().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testTeamToManySetOpParticipants(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Participant
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Participant{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, participantDBTypes, false, strmangle.SetComplement(participantPrimaryKeyColumns, participantColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetParticipants(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Participants().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetParticipants(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Participants().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.TeamID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.TeamID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if !queries.Equal(a.ID, d.TeamID) {
+		t.Error("foreign key was wrong value", a.ID, d.TeamID)
+	}
+	if !queries.Equal(a.ID, e.TeamID) {
+		t.Error("foreign key was wrong value", a.ID, e.TeamID)
+	}
+
+	if b.R.Team != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Team != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Team != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.Team != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.Participants[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.Participants[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testTeamToManyRemoveOpParticipants(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Team
+	var b, c, d, e Participant
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, teamDBTypes, false, strmangle.SetComplement(teamPrimaryKeyColumns, teamColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Participant{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, participantDBTypes, false, strmangle.SetComplement(participantPrimaryKeyColumns, participantColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddParticipants(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Participants().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveParticipants(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Participants().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.TeamID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.TeamID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.Team != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Team != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Team != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.Team != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.Participants) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.Participants[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.Participants[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
 func testTeamToOneBracketUsingBracket(t *testing.T) {
 	ctx := context.Background()
 	tx := MustTx(boil.BeginTx(ctx, nil))

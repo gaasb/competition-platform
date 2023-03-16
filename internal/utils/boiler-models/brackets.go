@@ -301,15 +301,18 @@ var BracketWhere = struct {
 // BracketRels is where relationship names are stored.
 var BracketRels = struct {
 	Tournament string
+	Matches    string
 	Teams      string
 }{
 	Tournament: "Tournament",
+	Matches:    "Matches",
 	Teams:      "Teams",
 }
 
 // bracketR is where relationships are stored.
 type bracketR struct {
 	Tournament *Tournament `boil:"Tournament" json:"Tournament" toml:"Tournament" yaml:"Tournament"`
+	Matches    MatchSlice  `boil:"Matches" json:"Matches" toml:"Matches" yaml:"Matches"`
 	Teams      TeamSlice   `boil:"Teams" json:"Teams" toml:"Teams" yaml:"Teams"`
 }
 
@@ -323,6 +326,13 @@ func (r *bracketR) GetTournament() *Tournament {
 		return nil
 	}
 	return r.Tournament
+}
+
+func (r *bracketR) GetMatches() MatchSlice {
+	if r == nil {
+		return nil
+	}
+	return r.Matches
 }
 
 func (r *bracketR) GetTeams() TeamSlice {
@@ -632,6 +642,20 @@ func (o *Bracket) Tournament(mods ...qm.QueryMod) tournamentQuery {
 	return Tournaments(queryMods...)
 }
 
+// Matches retrieves all the match's Matches with an executor.
+func (o *Bracket) Matches(mods ...qm.QueryMod) matchQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"matches\".\"bracket_id\"=?", o.ID),
+	)
+
+	return Matches(queryMods...)
+}
+
 // Teams retrieves all the team's Teams with an executor.
 func (o *Bracket) Teams(mods ...qm.QueryMod) teamQuery {
 	var queryMods []qm.QueryMod
@@ -762,6 +786,120 @@ func (bracketL) LoadTournament(ctx context.Context, e boil.ContextExecutor, sing
 					foreign.R = &tournamentR{}
 				}
 				foreign.R.Brackets = append(foreign.R.Brackets, local)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadMatches allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for a 1-M or N-M relationship.
+func (bracketL) LoadMatches(ctx context.Context, e boil.ContextExecutor, singular bool, maybeBracket interface{}, mods queries.Applicator) error {
+	var slice []*Bracket
+	var object *Bracket
+
+	if singular {
+		var ok bool
+		object, ok = maybeBracket.(*Bracket)
+		if !ok {
+			object = new(Bracket)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeBracket)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeBracket))
+			}
+		}
+	} else {
+		s, ok := maybeBracket.(*[]*Bracket)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeBracket)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeBracket))
+			}
+		}
+	}
+
+	args := make([]interface{}, 0, 1)
+	if singular {
+		if object.R == nil {
+			object.R = &bracketR{}
+		}
+		args = append(args, object.ID)
+	} else {
+	Outer:
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &bracketR{}
+			}
+
+			for _, a := range args {
+				if queries.Equal(a, obj.ID) {
+					continue Outer
+				}
+			}
+
+			args = append(args, obj.ID)
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	query := NewQuery(
+		qm.From(`matches`),
+		qm.WhereIn(`matches.bracket_id in ?`, args...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load matches")
+	}
+
+	var resultSlice []*Match
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice matches")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results in eager load on matches")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for matches")
+	}
+
+	if len(matchAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.Matches = resultSlice
+		for _, foreign := range resultSlice {
+			if foreign.R == nil {
+				foreign.R = &matchR{}
+			}
+			foreign.R.Bracket = object
+		}
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if queries.Equal(local.ID, foreign.BracketID) {
+				local.R.Matches = append(local.R.Matches, foreign)
+				if foreign.R == nil {
+					foreign.R = &matchR{}
+				}
+				foreign.R.Bracket = local
 				break
 			}
 		}
@@ -961,6 +1099,133 @@ func (o *Bracket) RemoveTournament(ctx context.Context, exec boil.ContextExecuto
 		related.R.Brackets = related.R.Brackets[:ln-1]
 		break
 	}
+	return nil
+}
+
+// AddMatches adds the given related objects to the existing relationships
+// of the bracket, optionally inserting them as new records.
+// Appends related to o.R.Matches.
+// Sets related.R.Bracket appropriately.
+func (o *Bracket) AddMatches(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*Match) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			queries.Assign(&rel.BracketID, o.ID)
+			if err = rel.Insert(ctx, exec, boil.Infer()); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"matches\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"bracket_id"}),
+				strmangle.WhereClause("\"", "\"", 2, matchPrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.IsDebug(ctx) {
+				writer := boil.DebugWriterFrom(ctx)
+				fmt.Fprintln(writer, updateQuery)
+				fmt.Fprintln(writer, values)
+			}
+			if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			queries.Assign(&rel.BracketID, o.ID)
+		}
+	}
+
+	if o.R == nil {
+		o.R = &bracketR{
+			Matches: related,
+		}
+	} else {
+		o.R.Matches = append(o.R.Matches, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &matchR{
+				Bracket: o,
+			}
+		} else {
+			rel.R.Bracket = o
+		}
+	}
+	return nil
+}
+
+// SetMatches removes all previously related items of the
+// bracket replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Bracket's Matches accordingly.
+// Replaces o.R.Matches with related.
+// Sets related.R.Bracket's Matches accordingly.
+func (o *Bracket) SetMatches(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*Match) error {
+	query := "update \"matches\" set \"bracket_id\" = null where \"bracket_id\" = $1"
+	values := []interface{}{o.ID}
+	if boil.IsDebug(ctx) {
+		writer := boil.DebugWriterFrom(ctx)
+		fmt.Fprintln(writer, query)
+		fmt.Fprintln(writer, values)
+	}
+	_, err := exec.ExecContext(ctx, query, values...)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove relationships before set")
+	}
+
+	if o.R != nil {
+		for _, rel := range o.R.Matches {
+			queries.SetScanner(&rel.BracketID, nil)
+			if rel.R == nil {
+				continue
+			}
+
+			rel.R.Bracket = nil
+		}
+		o.R.Matches = nil
+	}
+
+	return o.AddMatches(ctx, exec, insert, related...)
+}
+
+// RemoveMatches relationships from objects passed in.
+// Removes related items from R.Matches (uses pointer comparison, removal does not keep order)
+// Sets related.R.Bracket.
+func (o *Bracket) RemoveMatches(ctx context.Context, exec boil.ContextExecutor, related ...*Match) error {
+	if len(related) == 0 {
+		return nil
+	}
+
+	var err error
+	for _, rel := range related {
+		queries.SetScanner(&rel.BracketID, nil)
+		if rel.R != nil {
+			rel.R.Bracket = nil
+		}
+		if _, err = rel.Update(ctx, exec, boil.Whitelist("bracket_id")); err != nil {
+			return err
+		}
+	}
+	if o.R == nil {
+		return nil
+	}
+
+	for _, rel := range related {
+		for i, ri := range o.R.Matches {
+			if rel != ri {
+				continue
+			}
+
+			ln := len(o.R.Matches)
+			if ln > 1 && i < ln-1 {
+				o.R.Matches[i] = o.R.Matches[ln-1]
+			}
+			o.R.Matches = o.R.Matches[:ln-1]
+			break
+		}
+	}
+
 	return nil
 }
 

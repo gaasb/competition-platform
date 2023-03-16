@@ -1,4 +1,4 @@
-output = "./utils/boiler-models"
+output = "./boiler-models"
 wipe = true
 pkgname = "model"
 add-enum-types = true
@@ -9,7 +9,12 @@ add-enum-types = true
   user   = "blank"
   pass   = "qwerty"
   sslmode = "disable"
-#  schema = "test"
+#  schema = "schema"
 #  blacklist = ["migrations", "other"]
- [auto-columns]
-     created = "created_on"
+# [auto-columns]
+#     created = "created_on"
+
+
+
+#//go:generate sqlboiler --wipe psql
+#GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO username;

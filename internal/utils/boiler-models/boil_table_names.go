@@ -5,6 +5,8 @@ package model
 
 var TableNames = struct {
 	Brackets     string
+	Matches      string
+	Participants string
 	Teams        string
 	Tournaments  string
 	UserAccounts string
@@ -12,6 +14,8 @@ var TableNames = struct {
 	UsersEmail   string
 }{
 	Brackets:     "brackets",
+	Matches:      "matches",
+	Participants: "participants",
 	Teams:        "teams",
 	Tournaments:  "tournaments",
 	UserAccounts: "user_accounts",

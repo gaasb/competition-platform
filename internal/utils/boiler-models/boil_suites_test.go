@@ -13,6 +13,8 @@ import "testing"
 // Separating the tests thusly grants avoidance of Postgres deadlocks.
 func TestParent(t *testing.T) {
 	t.Run("Brackets", testBrackets)
+	t.Run("Matches", testMatches)
+	t.Run("Participants", testParticipants)
 	t.Run("Teams", testTeams)
 	t.Run("Tournaments", testTournaments)
 	t.Run("UserAccounts", testUserAccounts)
@@ -22,6 +24,8 @@ func TestParent(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	t.Run("Brackets", testBracketsDelete)
+	t.Run("Matches", testMatchesDelete)
+	t.Run("Participants", testParticipantsDelete)
 	t.Run("Teams", testTeamsDelete)
 	t.Run("Tournaments", testTournamentsDelete)
 	t.Run("UserAccounts", testUserAccountsDelete)
@@ -31,6 +35,8 @@ func TestDelete(t *testing.T) {
 
 func TestQueryDeleteAll(t *testing.T) {
 	t.Run("Brackets", testBracketsQueryDeleteAll)
+	t.Run("Matches", testMatchesQueryDeleteAll)
+	t.Run("Participants", testParticipantsQueryDeleteAll)
 	t.Run("Teams", testTeamsQueryDeleteAll)
 	t.Run("Tournaments", testTournamentsQueryDeleteAll)
 	t.Run("UserAccounts", testUserAccountsQueryDeleteAll)
@@ -40,6 +46,8 @@ func TestQueryDeleteAll(t *testing.T) {
 
 func TestSliceDeleteAll(t *testing.T) {
 	t.Run("Brackets", testBracketsSliceDeleteAll)
+	t.Run("Matches", testMatchesSliceDeleteAll)
+	t.Run("Participants", testParticipantsSliceDeleteAll)
 	t.Run("Teams", testTeamsSliceDeleteAll)
 	t.Run("Tournaments", testTournamentsSliceDeleteAll)
 	t.Run("UserAccounts", testUserAccountsSliceDeleteAll)
@@ -49,6 +57,8 @@ func TestSliceDeleteAll(t *testing.T) {
 
 func TestExists(t *testing.T) {
 	t.Run("Brackets", testBracketsExists)
+	t.Run("Matches", testMatchesExists)
+	t.Run("Participants", testParticipantsExists)
 	t.Run("Teams", testTeamsExists)
 	t.Run("Tournaments", testTournamentsExists)
 	t.Run("UserAccounts", testUserAccountsExists)
@@ -58,6 +68,8 @@ func TestExists(t *testing.T) {
 
 func TestFind(t *testing.T) {
 	t.Run("Brackets", testBracketsFind)
+	t.Run("Matches", testMatchesFind)
+	t.Run("Participants", testParticipantsFind)
 	t.Run("Teams", testTeamsFind)
 	t.Run("Tournaments", testTournamentsFind)
 	t.Run("UserAccounts", testUserAccountsFind)
@@ -67,6 +79,8 @@ func TestFind(t *testing.T) {
 
 func TestBind(t *testing.T) {
 	t.Run("Brackets", testBracketsBind)
+	t.Run("Matches", testMatchesBind)
+	t.Run("Participants", testParticipantsBind)
 	t.Run("Teams", testTeamsBind)
 	t.Run("Tournaments", testTournamentsBind)
 	t.Run("UserAccounts", testUserAccountsBind)
@@ -76,6 +90,8 @@ func TestBind(t *testing.T) {
 
 func TestOne(t *testing.T) {
 	t.Run("Brackets", testBracketsOne)
+	t.Run("Matches", testMatchesOne)
+	t.Run("Participants", testParticipantsOne)
 	t.Run("Teams", testTeamsOne)
 	t.Run("Tournaments", testTournamentsOne)
 	t.Run("UserAccounts", testUserAccountsOne)
@@ -85,6 +101,8 @@ func TestOne(t *testing.T) {
 
 func TestAll(t *testing.T) {
 	t.Run("Brackets", testBracketsAll)
+	t.Run("Matches", testMatchesAll)
+	t.Run("Participants", testParticipantsAll)
 	t.Run("Teams", testTeamsAll)
 	t.Run("Tournaments", testTournamentsAll)
 	t.Run("UserAccounts", testUserAccountsAll)
@@ -94,6 +112,8 @@ func TestAll(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	t.Run("Brackets", testBracketsCount)
+	t.Run("Matches", testMatchesCount)
+	t.Run("Participants", testParticipantsCount)
 	t.Run("Teams", testTeamsCount)
 	t.Run("Tournaments", testTournamentsCount)
 	t.Run("UserAccounts", testUserAccountsCount)
@@ -103,6 +123,8 @@ func TestCount(t *testing.T) {
 
 func TestHooks(t *testing.T) {
 	t.Run("Brackets", testBracketsHooks)
+	t.Run("Matches", testMatchesHooks)
+	t.Run("Participants", testParticipantsHooks)
 	t.Run("Teams", testTeamsHooks)
 	t.Run("Tournaments", testTournamentsHooks)
 	t.Run("UserAccounts", testUserAccountsHooks)
@@ -113,6 +135,10 @@ func TestHooks(t *testing.T) {
 func TestInsert(t *testing.T) {
 	t.Run("Brackets", testBracketsInsert)
 	t.Run("Brackets", testBracketsInsertWhitelist)
+	t.Run("Matches", testMatchesInsert)
+	t.Run("Matches", testMatchesInsertWhitelist)
+	t.Run("Participants", testParticipantsInsert)
+	t.Run("Participants", testParticipantsInsertWhitelist)
 	t.Run("Teams", testTeamsInsert)
 	t.Run("Teams", testTeamsInsertWhitelist)
 	t.Run("Tournaments", testTournamentsInsert)
@@ -129,6 +155,11 @@ func TestInsert(t *testing.T) {
 // or deadlocks can occur.
 func TestToOne(t *testing.T) {
 	t.Run("BracketToTournamentUsingTournament", testBracketToOneTournamentUsingTournament)
+	t.Run("MatchToBracketUsingBracket", testMatchToOneBracketUsingBracket)
+	t.Run("MatchToTeamUsingFirstTeamTeam", testMatchToOneTeamUsingFirstTeamTeam)
+	t.Run("MatchToTeamUsingSecondTeamTeam", testMatchToOneTeamUsingSecondTeamTeam)
+	t.Run("MatchToTeamUsingWinnerTeam", testMatchToOneTeamUsingWinnerTeam)
+	t.Run("ParticipantToTeamUsingTeam", testParticipantToOneTeamUsingTeam)
 	t.Run("TeamToBracketUsingBracket", testTeamToOneBracketUsingBracket)
 	t.Run("TournamentToUserAccountUsingCreatedByUserUserAccount", testTournamentToOneUserAccountUsingCreatedByUserUserAccount)
 	t.Run("UserTokenToUserAccountUsingUser", testUserTokenToOneUserAccountUsingUser)
@@ -143,7 +174,12 @@ func TestOneToOne(t *testing.T) {
 // TestToMany tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToMany(t *testing.T) {
+	t.Run("BracketToMatches", testBracketToManyMatches)
 	t.Run("BracketToTeams", testBracketToManyTeams)
+	t.Run("TeamToFirstTeamMatches", testTeamToManyFirstTeamMatches)
+	t.Run("TeamToSecondTeamMatches", testTeamToManySecondTeamMatches)
+	t.Run("TeamToWinnerMatches", testTeamToManyWinnerMatches)
+	t.Run("TeamToParticipants", testTeamToManyParticipants)
 	t.Run("TournamentToBrackets", testTournamentToManyBrackets)
 	t.Run("UserAccountToCreatedByUserTournaments", testUserAccountToManyCreatedByUserTournaments)
 }
@@ -152,6 +188,11 @@ func TestToMany(t *testing.T) {
 // or deadlocks can occur.
 func TestToOneSet(t *testing.T) {
 	t.Run("BracketToTournamentUsingBrackets", testBracketToOneSetOpTournamentUsingTournament)
+	t.Run("MatchToBracketUsingMatches", testMatchToOneSetOpBracketUsingBracket)
+	t.Run("MatchToTeamUsingFirstTeamMatches", testMatchToOneSetOpTeamUsingFirstTeamTeam)
+	t.Run("MatchToTeamUsingSecondTeamMatches", testMatchToOneSetOpTeamUsingSecondTeamTeam)
+	t.Run("MatchToTeamUsingWinnerMatches", testMatchToOneSetOpTeamUsingWinnerTeam)
+	t.Run("ParticipantToTeamUsingParticipants", testParticipantToOneSetOpTeamUsingTeam)
 	t.Run("TeamToBracketUsingTeams", testTeamToOneSetOpBracketUsingBracket)
 	t.Run("TournamentToUserAccountUsingCreatedByUserTournaments", testTournamentToOneSetOpUserAccountUsingCreatedByUserUserAccount)
 	t.Run("UserTokenToUserAccountUsingUserUserToken", testUserTokenToOneSetOpUserAccountUsingUser)
@@ -161,6 +202,11 @@ func TestToOneSet(t *testing.T) {
 // or deadlocks can occur.
 func TestToOneRemove(t *testing.T) {
 	t.Run("BracketToTournamentUsingBrackets", testBracketToOneRemoveOpTournamentUsingTournament)
+	t.Run("MatchToBracketUsingMatches", testMatchToOneRemoveOpBracketUsingBracket)
+	t.Run("MatchToTeamUsingFirstTeamMatches", testMatchToOneRemoveOpTeamUsingFirstTeamTeam)
+	t.Run("MatchToTeamUsingSecondTeamMatches", testMatchToOneRemoveOpTeamUsingSecondTeamTeam)
+	t.Run("MatchToTeamUsingWinnerMatches", testMatchToOneRemoveOpTeamUsingWinnerTeam)
+	t.Run("ParticipantToTeamUsingParticipants", testParticipantToOneRemoveOpTeamUsingTeam)
 	t.Run("TeamToBracketUsingTeams", testTeamToOneRemoveOpBracketUsingBracket)
 	t.Run("TournamentToUserAccountUsingCreatedByUserTournaments", testTournamentToOneRemoveOpUserAccountUsingCreatedByUserUserAccount)
 }
@@ -178,7 +224,12 @@ func TestOneToOneRemove(t *testing.T) {}
 // TestToManyAdd tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToManyAdd(t *testing.T) {
+	t.Run("BracketToMatches", testBracketToManyAddOpMatches)
 	t.Run("BracketToTeams", testBracketToManyAddOpTeams)
+	t.Run("TeamToFirstTeamMatches", testTeamToManyAddOpFirstTeamMatches)
+	t.Run("TeamToSecondTeamMatches", testTeamToManyAddOpSecondTeamMatches)
+	t.Run("TeamToWinnerMatches", testTeamToManyAddOpWinnerMatches)
+	t.Run("TeamToParticipants", testTeamToManyAddOpParticipants)
 	t.Run("TournamentToBrackets", testTournamentToManyAddOpBrackets)
 	t.Run("UserAccountToCreatedByUserTournaments", testUserAccountToManyAddOpCreatedByUserTournaments)
 }
@@ -186,7 +237,12 @@ func TestToManyAdd(t *testing.T) {
 // TestToManySet tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToManySet(t *testing.T) {
+	t.Run("BracketToMatches", testBracketToManySetOpMatches)
 	t.Run("BracketToTeams", testBracketToManySetOpTeams)
+	t.Run("TeamToFirstTeamMatches", testTeamToManySetOpFirstTeamMatches)
+	t.Run("TeamToSecondTeamMatches", testTeamToManySetOpSecondTeamMatches)
+	t.Run("TeamToWinnerMatches", testTeamToManySetOpWinnerMatches)
+	t.Run("TeamToParticipants", testTeamToManySetOpParticipants)
 	t.Run("TournamentToBrackets", testTournamentToManySetOpBrackets)
 	t.Run("UserAccountToCreatedByUserTournaments", testUserAccountToManySetOpCreatedByUserTournaments)
 }
@@ -194,13 +250,20 @@ func TestToManySet(t *testing.T) {
 // TestToManyRemove tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToManyRemove(t *testing.T) {
+	t.Run("BracketToMatches", testBracketToManyRemoveOpMatches)
 	t.Run("BracketToTeams", testBracketToManyRemoveOpTeams)
+	t.Run("TeamToFirstTeamMatches", testTeamToManyRemoveOpFirstTeamMatches)
+	t.Run("TeamToSecondTeamMatches", testTeamToManyRemoveOpSecondTeamMatches)
+	t.Run("TeamToWinnerMatches", testTeamToManyRemoveOpWinnerMatches)
+	t.Run("TeamToParticipants", testTeamToManyRemoveOpParticipants)
 	t.Run("TournamentToBrackets", testTournamentToManyRemoveOpBrackets)
 	t.Run("UserAccountToCreatedByUserTournaments", testUserAccountToManyRemoveOpCreatedByUserTournaments)
 }
 
 func TestReload(t *testing.T) {
 	t.Run("Brackets", testBracketsReload)
+	t.Run("Matches", testMatchesReload)
+	t.Run("Participants", testParticipantsReload)
 	t.Run("Teams", testTeamsReload)
 	t.Run("Tournaments", testTournamentsReload)
 	t.Run("UserAccounts", testUserAccountsReload)
@@ -210,6 +273,8 @@ func TestReload(t *testing.T) {
 
 func TestReloadAll(t *testing.T) {
 	t.Run("Brackets", testBracketsReloadAll)
+	t.Run("Matches", testMatchesReloadAll)
+	t.Run("Participants", testParticipantsReloadAll)
 	t.Run("Teams", testTeamsReloadAll)
 	t.Run("Tournaments", testTournamentsReloadAll)
 	t.Run("UserAccounts", testUserAccountsReloadAll)
@@ -219,6 +284,8 @@ func TestReloadAll(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	t.Run("Brackets", testBracketsSelect)
+	t.Run("Matches", testMatchesSelect)
+	t.Run("Participants", testParticipantsSelect)
 	t.Run("Teams", testTeamsSelect)
 	t.Run("Tournaments", testTournamentsSelect)
 	t.Run("UserAccounts", testUserAccountsSelect)
@@ -228,6 +295,8 @@ func TestSelect(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	t.Run("Brackets", testBracketsUpdate)
+	t.Run("Matches", testMatchesUpdate)
+	t.Run("Participants", testParticipantsUpdate)
 	t.Run("Teams", testTeamsUpdate)
 	t.Run("Tournaments", testTournamentsUpdate)
 	t.Run("UserAccounts", testUserAccountsUpdate)
@@ -237,6 +306,8 @@ func TestUpdate(t *testing.T) {
 
 func TestSliceUpdateAll(t *testing.T) {
 	t.Run("Brackets", testBracketsSliceUpdateAll)
+	t.Run("Matches", testMatchesSliceUpdateAll)
+	t.Run("Participants", testParticipantsSliceUpdateAll)
 	t.Run("Teams", testTeamsSliceUpdateAll)
 	t.Run("Tournaments", testTournamentsSliceUpdateAll)
 	t.Run("UserAccounts", testUserAccountsSliceUpdateAll)

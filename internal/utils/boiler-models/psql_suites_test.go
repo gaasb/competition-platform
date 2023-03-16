@@ -8,6 +8,10 @@ import "testing"
 func TestUpsert(t *testing.T) {
 	t.Run("Brackets", testBracketsUpsert)
 
+	t.Run("Matches", testMatchesUpsert)
+
+	t.Run("Participants", testParticipantsUpsert)
+
 	t.Run("Teams", testTeamsUpsert)
 
 	t.Run("Tournaments", testTournamentsUpsert)

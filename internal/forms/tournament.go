@@ -1,48 +1,103 @@
 package forms
 
 import (
-	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"github.com/gaasb/competition-platform/internal/utils"
 	model "github.com/gaasb/competition-platform/internal/utils/boiler-models"
-	"github.com/satori/go.uuid"
+	"github.com/gin-gonic/gin"
+	"log"
+
+	//"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid"
 	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"time"
 )
 
 const (
-	BRACKETS_LIMIT = 5
+	BRACKETS_LIMIT    = 5
+	BRACKETS_SIZE_MAX = 50
+	BRACKETS_SIZE_MIN = 1
+)
+
+var (
+	QueryForTournament = []string{
+		model.TournamentColumns.SportName,
+		model.TournamentColumns.Title,
+		model.TournamentColumns.Description,
+		model.UserAccountColumns.UserLogin,
+		model.TournamentColumns.StartAt,
+		model.TournamentColumns.EndAt,
+		model.TournamentColumns.IsActive,
+	}
+
+	InnerJoinForUserName = fmt.Sprintf("%s on %s = %s",
+		model.TableNames.UserAccounts,
+		model.UserAccountTableColumns.ID,
+		model.TournamentTableColumns.CreatedByUser)
 )
 
 type TournamentsForm struct {
-	DisciplineName string `form:"sport_name" binding:"required,lte=5" boil:"sport_name"`
-	Title          string `form:"required,gte=1,lte=30" json:"title" boil:"title"`
+	Id             string    `form:"-" json:"id,omitempty" boil:"id"`
+	DisciplineName string    `form:"discipline_name" json:"discipline_name" binding:"required,lte=32,gte=2" boil:"sport_name"`
+	Title          string    `form:"title" json:"title" binding:"required,lte=32,gte=2" boil:"title"`
+	StartAt        time.Time `form:"start_at" json:"start_at" binding:"required_with=EndAt,checktime" boil:"start_at"`
+	EndAt          time.Time `form:"end_at" json:"end_at" binding:"required_with=StartAt,gtfield=StartAt" boil:"end_at"`
+	Description    null.JSON `form:"description" json:"description" binding:"json" boil:"description"`
 }
-type TournamentsWithCounter struct {
-	model.Tournament `boil:"bind="`
-	Count            int
+type TournamentsUpdateForm struct {
+	DisciplineName string    `form:"discipline_name" json:"discipline_name,omitempty" binding:"omitempty,lte=32,gte=2"`
+	Title          string    `form:"title" json:"title,omitempty" binding:"omitempty,lte=32,gte=2"`
+	StartAt        time.Time `form:"start_at" json:"start_at,omitempty" binding:"required_with=EndAt"`
+	EndAt          time.Time `form:"end_at" json:"end_at,omitempty" binding:"required_with=StartAt,omitempty,gtfield=StartAt"`
+	Description    null.JSON `form:"description" json:"description,omitempty" binding:"json"`
 }
 
-func AddTournament(data model.Tournament, ctx context.Context) {
+type Tournament struct {
+	TournamentsForm `boil:"tournaments,bind"`
+	CreatedByUser   string           `boil:"user_accounts.user_login" json:"creator"`
+	IsActive        bool             `boil:"is_active" json:"is_active"`
+	Brackets        []*model.Bracket `boil:"-" json:"brackets,omitempty"`
+}
 
-	data = model.Tournament{
-		ID:            uuid.NewV4().String(),
-		SportName:     "",
-		Title:         "",
-		StartAt:       time.Time{},
-		EndAt:         time.Time{},
-		Description:   null.JSON{},
-		CreatedByUser: null.Int64{},
+func (t TournamentsForm) Create(db *sql.DB, ctx *gin.Context) (*TournamentsForm, error) {
+
+	var userId int64
+	rawId, hasValue := ctx.Get("user_id")
+	if !hasValue {
+		return nil, errors.New(utils.NoPermission)
+	}
+	if value, ok := rawId.(int64); ok {
+		userId = value
+	} else {
+		return nil, errors.New(utils.NoPermission)
+	}
+
+	id, err := uuid.NewV6()
+	if err != nil {
+		log.Println(err.Error())
+		return nil, errors.New("problem on generation uuid")
+	}
+	t.Id = id.String()
+
+	tournament := model.Tournament{
+		ID:            t.Id,
+		SportName:     t.DisciplineName,
+		Title:         t.Title,
+		StartAt:       t.StartAt.UTC(),
+		EndAt:         t.EndAt.UTC(),
+		Description:   t.Description,
+		CreatedByUser: null.Int64From(userId),
 		BracketsLimit: BRACKETS_LIMIT,
-		R:             nil,
 	}
-	uuid.NewV4().String()
-	model.Tournament.
-		Insert(data, ctx, utils.DB(), boil.Infer())
-}
-func GetTournament() {}
-func (t *TournamentsForm) EditTournament(id string, editable map[string]interface{}) {
-	_ = map[string]interface{}{
-		model.TournamentColumns.ID: id,
+	err = tournament.Insert(ctx, db, boil.Infer())
+	if err != nil {
+		log.Println(err.Error())
+		return nil, errors.New("invalid data")
 	}
+
+	return &t, nil
+
 }

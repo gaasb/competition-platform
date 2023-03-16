@@ -1,42 +1,44 @@
-package internal
+package utils
 
-//go:generate sqlboiler --wipe psql
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	dbmodels "github.com/gaasb/competition-platform/internal/boiler-models"
-	"github.com/gaasb/competition-platform/internal/utils"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/volatiletech/sqlboiler/v4/boil"
+	"log"
 	"os"
 )
 
 const DB_DRIVER = "pgx"
 
-type Postgres struct {
-	//conn *sql.Conn
-	db *sql.DB
+func GetDB() *sql.DB {
+	return config.db
 }
 
-var conn Postgres
+func CloseDB() {
+	err := config.db.Close()
+	if err != nil {
+		log.Println(err.Error())
+	}
+}
 
-func InitDB() {
+func setupDatabase() {
+	dsn := dsnAddr()
 
-	//"postgres://blank:qwerty@host.docker.internal:5432/main"
-	dSN := dbConnAddr()
-	db, err := sql.Open(DB_DRIVER, dSN)
-	utils.HandleError(err)
-	//defer db.Close()
+	db, err := sql.Open(DB_DRIVER, dsn)
+	dieIf(err)
+	boil.SetDB(db)
+
 	err = db.Ping()
-	utils.HandleError(err)
-	fmt.Println("Successfully connected!")
-	conn = Postgres{db}
-	fmt.Println(dbmodels.Tests().One(context.Background(), db))
+	dieIf(err)
+
+	config.db = db
 	//boil.SetDB(conn.db)
 }
 
-func dbConnAddr() string {
-	dSN := fmt.Sprintf(
+func dsnAddr() string {
+	//"postgres://login:password@host.docker.internal:5432/database"
+	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_PORT"),
@@ -44,17 +46,5 @@ func dbConnAddr() string {
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_NAME"),
 	)
-	return dSN
+	return dsn
 }
-
-func GetRef() *sql.DB {
-	return conn.db
-}
-func GetVal(ctx context.Context) dbmodels.TestSlice {
-	tes, _ := dbmodels.Tests().All(ctx, conn.db)
-	return tes
-}
-
-//CREATE USER docker;
-//CREATE DATABASE app;
-//GRANT ALL PRIVILEGES ON DATABASE app TO docker;

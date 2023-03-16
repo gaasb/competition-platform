@@ -1,38 +1,24 @@
-package internal
+package utils
 
 import (
-	"github.com/gin-gonic/gin"
+	"database/sql"
 	"github.com/joho/godotenv"
+	_ "github.com/joho/godotenv"
 	"log"
-	"os"
 )
 
-var config = Config{}
+var config Config
 
 type Config struct {
+	db *sql.DB
 }
 
-func (c *Config) setTestMode()       {}
-func (c *Config) setProductionMode() {}
-
-func init() {
+func Init() {
 	err := godotenv.Load(".env")
-	HandleError(err)
-}
+	dieIf(err)
 
-func HandleError(err error) {
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-}
+	config = Config{}
 
-func UpdateConfigMode() {
-	if gin.Mode() == gin.ReleaseMode {
-		config.setProductionMode()
-	} else {
-		config.setTestMode()
-	}
+	setupDatabase()
+	log.Println("Successfully connected to database!")
 }
-
-func UpdateCorsSettings() {}
