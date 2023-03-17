@@ -4,7 +4,7 @@ import model "github.com/gaasb/competition-platform/internal/utils/boiler-models
 
 type ParticipantForm struct {
 	Team         string        `form:"team" json:"team,omitempty" binding:"lte=20,gte=2"`
-	Participants []Participant `form:"participants" json:"participants" binding:"required,dive,unique=UserAlias.field"`
+	Participants []Participant `form:"participants" json:"participants" binding:"required,dive"`
 }
 
 type ParticipantsFromTeam struct {
