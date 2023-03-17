@@ -68,7 +68,7 @@ func (t TournamentService) FindAllTournaments(ctx context.Context) (any, error) 
 		return nil, errors.New("some problem to find tournaments")
 	}
 
-	orderBy := model.TournamentTableColumns.ID // TODO sort by column
+	orderBy := model.TournamentTableColumns.ID
 	if currentPage < prevPage {
 		orderBy += ` asc`
 	} else {
@@ -80,16 +80,17 @@ func (t TournamentService) FindAllTournaments(ctx context.Context) (any, error) 
 
 	var output []*forms.Tournament
 
-	err = model.NewQuery(
+	if err = model.NewQuery(
 		qm.Select(append(forms.QueryForTournament, model.TournamentTableColumns.ID)...),
 		qm.From(model.TableNames.Tournaments),
 		qm.InnerJoin(forms.InnerJoinForUserName),
 		qm.OrderBy(orderBy),
 		qm.Offset(offset),
 		qm.Limit(limit)).
-		Bind(ctx, db, &output)
-	if err != nil {
-		return nil, err
+		Bind(ctx, db, &output); err != nil {
+
+		log.Println(err.Error())
+		return nil, errors.New("tournaments not found")
 	}
 
 	return struct {
@@ -101,6 +102,7 @@ func (t TournamentService) FindAllTournaments(ctx context.Context) (any, error) 
 
 func (t TournamentService) GetTournamentBy(id string, ctx context.Context) (*forms.Tournament, error) {
 
+	var err error
 	var output forms.Tournament
 
 	var withBrackets bool
@@ -108,34 +110,33 @@ func (t TournamentService) GetTournamentBy(id string, ctx context.Context) (*for
 		withBrackets = value.(bool)
 	}
 
-	err := model.NewQuery(
+	if err = model.NewQuery(
 		qm.Select(forms.QueryForTournament...),
 		qm.From(model.TableNames.Tournaments),
 		qm.InnerJoin(forms.InnerJoinForUserName),
 		model.TournamentWhere.ID.EQ(id),
 		qm.Limit(1)).
-		Bind(ctx, db, &output)
+		Bind(ctx, db, &output); err != nil {
 
-	if err != nil {
 		log.Println(err.Error())
 		return nil, errors.New("tournament not found")
 	}
 
 	if withBrackets {
-		brackets, _ := model.Brackets(
+		var brackets []*model.Bracket
+
+		if brackets, err = model.Brackets(
 			qm.Select(forms.QueryForBrackets...),
 			qm.Load(model.BracketRels.Tournament),
 			model.BracketWhere.TournamentID.EQ(null.StringFrom(id))).
-			All(ctx, db)
+			All(ctx, db); err != nil {
 
-		if err != nil {
 			log.Println(err.Error())
 			return nil, errors.New("brackets not found")
 		}
 		output.Brackets = brackets
 	}
 	return &output, nil
-
 }
 
 func (t TournamentService) UpdateTournamentBy(id string, params forms.TournamentsUpdateForm, ctx context.Context) error {
@@ -191,7 +192,7 @@ func (t TournamentService) UpdateTournamentBy(id string, params forms.Tournament
 	}
 
 	if _, err = tournament.Update(ctx, db, boil.Infer()); err != nil {
-		log.Println(err)
+		log.Println(err.Error())
 		return errors.New("failed to update")
 	}
 	return nil
@@ -212,7 +213,7 @@ func (t TournamentService) DeleteTournamentBy(id string, ctx context.Context) er
 
 	tournament, err := model.FindTournament(ctx, db, id)
 	if err != nil {
-		return errors.New("There are no tournaments to delete.")
+		return errors.New("There are no tournaments to delete")
 	}
 	if tournament.CreatedByUser.Int64 != userId {
 		return errors.New(utils.NoPermission)
@@ -220,8 +221,8 @@ func (t TournamentService) DeleteTournamentBy(id string, ctx context.Context) er
 
 	_, err = tournament.Delete(ctx, db)
 	if err != nil {
-		log.Printf("Error on delete tournament: %v", err.Error())
-		return errors.New("cant on delete tournament.")
+		log.Println(err.Error())
+		return errors.New("cant on delete tournament")
 	}
 	return nil
 }
@@ -256,7 +257,8 @@ func (t TournamentService) AddBracket(tournamentId string, form forms.BracketFor
 
 	id, err := uuid.NewV6()
 	if err != nil {
-		return nil, err
+		log.Println(err.Error())
+		return nil, errors.New("problem with generation id for bracket")
 	}
 
 	bracket := model.Bracket{
@@ -270,9 +272,12 @@ func (t TournamentService) AddBracket(tournamentId string, form forms.BracketFor
 		GrandFinalRounds:    form.GrandFinalRounds,
 	}
 
-	err = bracket.Insert(ctx, db, boil.Infer())
-	return &bracket, err
+	if err = bracket.Insert(ctx, db, boil.Infer()); err != nil {
+		log.Println(err.Error())
+		return nil, errors.New("bracket need to be unique")
 
+	}
+	return &bracket, nil
 }
 
 func (t TournamentService) UpdateBracketStatus(bracketId string, status model.BracketStatus, ctx context.Context) error {
