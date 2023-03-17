@@ -445,7 +445,6 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 	if value, ok := ctx.Value("update").(bool); ok {
 		isUpdate = value
 	}
-	fmt.Println(isUpdate)
 
 	var err error
 	var bracket *model.Bracket
@@ -455,7 +454,6 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 	if err = verificationForBracket(userId, bracket, ctx); err != nil {
 		return err
 	}
-	fmt.Println(len(form.Participants), bracket.MaxTeamParticipants)
 	if len(form.Participants) != bracket.MaxTeamParticipants {
 		return errors.New("the number of participants should be equal to bracket max participants")
 	}
@@ -464,66 +462,52 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 		return errors.New(fmt.Sprintf("bracket is %s", bracket.Status.String()))
 	}
 
-	var team = new(model.Team)
-	team.TeamAlias = form.Team
-
-	tx, err := boil.BeginTx(ctx, nil)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Printf("%s %v", utils.BeginTxErr, err)
 		return errors.New(utils.BeginTxErr)
 	}
 
-	//defer func(err error) {
-	//	if err != nil {
-	//		if err = tx.Rollback(); err != nil {
-	//			log.Printf("%s %v", utils.RollbackTxErr, err.Error())
-	//		}
-	//		return
-	//	}
-	//	// Create match
-	//
-	//	if err = tx.Commit(); err != nil {
-	//		log.Printf("%s %v", utils.CommitTxErr, err.Error())
-	//	}
-	//}(err)
+	defer func() {
+		if err != nil {
+			if err = tx.Rollback(); err != nil {
+				log.Println(err.Error())
+			}
+		} else {
+			err = tx.Commit()
+		}
+	}()
 
-	tx, err = boil.BeginTx(ctx, nil)
-
-	if err != nil {
-		log.Printf("%s %v", utils.BeginTxErr, err)
-		return errors.New(utils.BeginTxErr)
-	}
-	//var isInsert bool
-	if err = bracket.AddTeams(ctx, db, true, team); err != nil || isUpdate {
-		err = tx.Rollback()
+	var teamId int64
+	if err = tx.QueryRow(
+		`INSERT INTO teams (team_alias, bracket_id) VALUES ($1, $2) RETURNING id`,
+		form.Team,
+		bracketId).Scan(&teamId); err != nil || isUpdate {
 		return errors.New("team is already in bracket")
 	}
-	err = tx.Rollback()
+
 	var totalTeams int64
 	if totalTeams, err = bracket.Teams().Count(ctx, db); err != nil {
-		err = tx.Rollback()
 		return errors.New("the number of participants reached a maximum")
 	}
-	fmt.Println(totalTeams, bracket.MaxTeams.Int)
+
 	if int(totalTeams) > bracket.MaxTeams.Int {
-		err = tx.Rollback()
-		return errors.New("the number of teams reached a maximum")
+		err = errors.New("the number of teams reached a maximum")
+		return err
 	}
 
-	var participants = make([]*model.Participant, len(form.Participants))
-	for i, item := range form.Participants {
-		participants[i] = &model.Participant{
-			UserAlias: item.UserAlias,
-			Contact:   null.StringFrom(item.Contact),
+	for _, item := range form.Participants {
+
+		if _, err = tx.Exec(
+			`INSERT INTO participants (user_alias, team_id, contact) VALUES ($1, $2, $3)`,
+			item.UserAlias,
+			teamId,
+			item.Contact); err != nil {
+			return errors.New("participant user alias need to be unique in team")
 		}
-	}
-	//isUpdate insert = false
-	if err = team.AddParticipants(ctx, db, true, participants...); err != nil {
-		err = tx.Rollback()
-		return errors.New("participant user alias need to be unique in team" + err.Error())
-	}
 
-	return err
+	}
+	return nil
 }
 
 func (t TournamentService) DeleteParticipantsBy(bracketId string, teamAlias string, ctx context.Context) error {
@@ -628,7 +612,7 @@ func verificationForTournament(userId int64, tournament *model.Tournament) error
 		return errors.New(utils.NoPermission)
 	}
 
-	if tournament.EndAt.After(time.Now().UTC()) {
+	if tournament.EndAt.Before(time.Now().UTC()) {
 		return errors.New("tournament is ended")
 	}
 	return nil
