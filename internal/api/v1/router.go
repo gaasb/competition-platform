@@ -26,14 +26,14 @@ func (r *TournamentRouter) Setup(router *gin.Engine) {
 		tournaments.GET("/", handleGetTournamentsList)    //✅	?page prev limit
 		tournaments.POST("/", handleNewTournament)        //✅
 		tournaments.DELETE(":id", handleDeleteTournament) //✅
-		tournaments.PUT(":id", handleUpdateTournament)    //✅ TODO omit time.Time from JSON and description
+		tournaments.PATCH(":id", handleUpdateTournament)  //✅ TODO omit time.Time from JSON and description
 
 		bracket := v1.Group("/bracket")
 
-		bracket.GET(":tid", handleGetBrackets)        //✅
-		bracket.POST(":tid", handleNewBracket)        //✅
-		bracket.DELETE(":id", handleDeleteBracket)    //✅
-		bracket.PUT(":id", handleUpdateStatusBracket) //✅	?start=true end
+		bracket.GET(":tid", handleGetBrackets)          //✅
+		bracket.POST(":tid", handleNewBracket)          //✅
+		bracket.DELETE(":id", handleDeleteBracket)      //✅
+		bracket.PATCH(":id", handleUpdateStatusBracket) //✅	?start=true end
 
 		bracket.GET("participants/:id/", handleGetAllParticipants)
 		bracket.POST("participants/:id/", handleAddParticipant)
