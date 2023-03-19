@@ -304,8 +304,28 @@ func (t TournamentService) UpdateBracketStatus(bracketId string, status model.Br
 		return err
 	}
 
-	if status == model.BracketStatusFinished {
+	switch status {
+	case model.BracketStatusFinished:
+		if bracket.Status == model.BracketStatusFinished {
+
+		}
 		bracket.Status = model.BracketStatusFinished
+
+	case model.BracketStatusLive:
+		if bracket.Status != model.BracketStatusPending {
+			return errors.New(fmt.Sprintf("current status is %s", bracket.Status.String()))
+		}
+
+		var totalTeams int64
+		totalTeams, err = model.Teams(model.TeamWhere.BracketID.EQ(null.StringFrom(bracketId))).Count(ctx, db)
+
+		if int(totalTeams) >= 2 {
+			bracket.Status = model.BracketStatusLive
+		} else {
+			return errors.New("the current number of teams is less than 2")
+		}
+	default:
+		return errors.New("unknown status")
 	}
 
 	if status == model.BracketStatusLive { //TODO CREATE MATCHES
