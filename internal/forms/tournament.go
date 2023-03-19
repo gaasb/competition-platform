@@ -40,7 +40,7 @@ var (
 )
 
 type TournamentsForm struct {
-	Id             string    `form:"-" json:"id,omitempty" boil:"id"`
+	Id             string    `form:"-" json:"id" boil:"id"`
 	DisciplineName string    `form:"discipline_name" json:"discipline_name" binding:"required,lte=32,gte=2" boil:"sport_name"`
 	Title          string    `form:"title" json:"title" binding:"required,lte=32,gte=2" boil:"title"`
 	StartAt        time.Time `form:"start_at" json:"start_at" binding:"required_with=EndAt,checktime" boil:"start_at"`
@@ -62,23 +62,23 @@ type Tournament struct {
 	Brackets        []*model.Bracket `boil:"-" json:"brackets,omitempty"`
 }
 
-func (t TournamentsForm) Create(db *sql.DB, ctx *gin.Context) (*TournamentsForm, error) {
+func (t *TournamentsForm) Create(db *sql.DB, ctx *gin.Context) error {
 
 	var userId int64
 	rawId, hasValue := ctx.Get("user_id")
 	if !hasValue {
-		return nil, errors.New(utils.NoPermission)
+		return errors.New(utils.NoPermission)
 	}
 	if value, ok := rawId.(int64); ok {
 		userId = value
 	} else {
-		return nil, errors.New(utils.NoPermission)
+		return errors.New(utils.NoPermission)
 	}
 
 	id, err := uuid.NewV6()
 	if err != nil {
 		log.Println(err.Error())
-		return nil, errors.New("problem on generation uuid")
+		return errors.New("problem on generation uuid")
 	}
 	t.Id = id.String()
 
@@ -92,12 +92,12 @@ func (t TournamentsForm) Create(db *sql.DB, ctx *gin.Context) (*TournamentsForm,
 		CreatedByUser: null.Int64From(userId),
 		BracketsLimit: BRACKETS_LIMIT,
 	}
-	err = tournament.Insert(ctx, db, boil.Infer())
-	if err != nil {
+
+	if err = tournament.Insert(ctx, db, boil.Infer()); err != nil {
 		log.Println(err.Error())
-		return nil, errors.New("invalid data")
+		return errors.New("invalid data")
 	}
 
-	return &t, nil
+	return nil
 
 }
