@@ -13,6 +13,7 @@ TBD !!! Not working
 make build
 make run
 ```
+---
 ### Available routes for REST API:
 Default response:
 ```json
@@ -55,6 +56,7 @@ Payload:
 > **PUT**: `/api/v1/tournament/:id` - To **update** the data for the tournament. Look at **JSON payload** on **POST** method.
 
 > **DELETE**: `/api/v1/tournament/:id` - To delete tournament.
+> 
 ---
 ### Brackets group:
 **:id** is bracket id
