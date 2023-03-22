@@ -18,6 +18,7 @@ const (
 	ERR = "error"
 )
 
+// Helper for response
 func respMsg(status string, data any, message ...string) gin.H {
 	return map[string]any{
 		"status":  status,
@@ -26,6 +27,7 @@ func respMsg(status string, data any, message ...string) gin.H {
 	}
 }
 
+// Default error handler
 func noRoute(ctx *gin.Context) {
 	ctx.AbortWithStatusJSON(http.StatusBadRequest,
 		respMsg(ERR, nil, "bad request"))
@@ -44,7 +46,7 @@ func handleAllowMethods(ctx *gin.Context) {
 
 func handleNewTournament(ctx *gin.Context) {
 
-	var form forms.TournamentsForm
+	var form *forms.TournamentsForm
 	err := ctx.ShouldBindJSON(&form)
 	if err != nil {
 		vErr := utils.ValidateErrors(err)
@@ -54,8 +56,9 @@ func handleNewTournament(ctx *gin.Context) {
 		return
 	}
 
-	tournament, err := form.Create(db, ctx)
-	if err != nil {
+	//var tournament *forms.TournamentsForm
+
+	if err = form.Create(db, ctx); err != nil {
 		ctx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			respMsg(ERR, nil, err.Error()))
@@ -63,7 +66,7 @@ func handleNewTournament(ctx *gin.Context) {
 	}
 	ctx.JSON(
 		http.StatusOK,
-		respMsg(OK, tournament, "created"))
+		respMsg(OK, form, "created"))
 }
 
 func handleDeleteTournament(ctx *gin.Context) {
@@ -383,15 +386,15 @@ func handleDeleteParticipants(ctx *gin.Context) {
 		respMsg(OK, nil, "team with participants successfully deleted"))
 }
 
-func handleUpdateMatch(ctx *gin.Context) {
+func handleUpdateMatchScore(ctx *gin.Context) {
 
 	var err error
-	idParam := ctx.Param("id")
-	var matchId int64
-	if matchId, err = strconv.ParseInt(idParam, 10, 64); err != nil {
+	idParam := ctx.Param("bid")
+	bracketId, err := uuid.FromString(idParam)
+	if err != nil {
 		ctx.AbortWithStatusJSON(
 			http.StatusBadRequest,
-			respMsg(ERR, nil, "invalid id"),
+			respMsg(ERR, nil, "id must be in uuid format"),
 		)
 		return
 	}
@@ -404,7 +407,7 @@ func handleUpdateMatch(ctx *gin.Context) {
 		return
 	}
 
-	if err = service.UpdateMatchBy(matchId, form, ctx); err != nil {
+	if err = service.UpdateMatchScoreBy(bracketId.String(), form, ctx); err != nil {
 		ctx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			respMsg(ERR, nil, err.Error()))
@@ -414,4 +417,31 @@ func handleUpdateMatch(ctx *gin.Context) {
 	ctx.JSON(
 		http.StatusOK,
 		respMsg(OK, nil, "match successfully updated"))
+}
+
+func handleGetAllMatches(ctx *gin.Context) {
+
+	var err error
+	idParam := ctx.Param("bid")
+	bracketId, err := uuid.FromString(idParam)
+	if err != nil {
+		ctx.AbortWithStatusJSON(
+			http.StatusBadRequest,
+			respMsg(ERR, nil, "id must be in uuid format"),
+		)
+		return
+	}
+
+	var matches []*forms.Match
+	if matches, err = service.FindAllMatches(bracketId.String(), ctx); err != nil {
+		ctx.AbortWithStatusJSON(
+			http.StatusBadRequest,
+			respMsg(ERR, nil, err.Error()),
+		)
+		return
+	}
+
+	ctx.JSON(
+		http.StatusOK,
+		respMsg(OK, matches))
 }

@@ -13,7 +13,6 @@ TBD !!! Not working
 make build
 make run
 ```
----
 ### Available routes for REST API:
 Default response:
 ```json
@@ -25,6 +24,7 @@ Default response:
   "status": "error"
 }
 ```
+
 `status` have only two states: `ok` and `error`.
 Possibles responses code: `200`, `400`, `401`, `404`
 ---
@@ -61,7 +61,7 @@ Payload:
 ### Brackets group:
 **:id** is bracket id
 **:tid** is tournament id
-... To **create** new bracket and **update** status in **unavailable** when tournament is **ended**.
+... To **create** new bracket and **update** status is **unavailable** when tournament is **ended**.
 Bracket have 3 states: `pending`, `live` and `finished`. Default status is `pending`.
 > **GET**: `/api/v1/bracket/:tid` - To get all brackets from tournament.
 

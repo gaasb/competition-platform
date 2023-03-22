@@ -13,6 +13,8 @@ type TournamentRouter struct{}
 func (r *TournamentRouter) Setup(router *gin.Engine) {
 	api := router.Group("/api")
 	{
+		api.OPTIONS("/", handleAllowMethods) // 405 Method Not Allowed записываем в загаловки и проверяем в другх методах
+
 		v1 := api.Group("/v1")
 
 		v1.POST("/login")
@@ -21,12 +23,11 @@ func (r *TournamentRouter) Setup(router *gin.Engine) {
 
 		tournaments := v1.Group("/tournament/")
 
-		tournaments.OPTIONS("/", handleAllowMethods)      // 405 Method Not Allowed записываем в загаловки и проверяем в другх методах
 		tournaments.GET(":id", handleGetTournament)       //✅	?brackets=true
 		tournaments.GET("/", handleGetTournamentsList)    //✅	?page prev limit
 		tournaments.POST("/", handleNewTournament)        //✅
 		tournaments.DELETE(":id", handleDeleteTournament) //✅
-		tournaments.PATCH(":id", handleUpdateTournament)  //✅ TODO omit time.Time from JSON and description
+		tournaments.PUT(":id", handleUpdateTournament)    //✅ TODO omit time.Time from JSON and description
 
 		bracket := v1.Group("/bracket")
 
@@ -41,9 +42,8 @@ func (r *TournamentRouter) Setup(router *gin.Engine) {
 
 		match := v1.Group("/match")
 
-		match.POST("/:id")
-		match.PUT("/:id", handleUpdateMatch)
-		match.DELETE("/:id")
+		match.GET(":bid", handleGetAllMatches)
+		match.PATCH(":bid", handleUpdateMatchScore)
 
 	}
 	router.NoRoute(noRoute)

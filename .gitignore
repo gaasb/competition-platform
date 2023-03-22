@@ -16,3 +16,4 @@
 .env
 .idea/
 /internal/utils/boiler-models/
+.env

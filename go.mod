@@ -5,11 +5,12 @@ go 1.20
 require (
 	github.com/friendsofgo/errors v0.9.2
 	github.com/gin-gonic/gin v1.8.2
+	github.com/go-playground/validator/v10 v10.11.2
+	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/jackc/pgx/v5 v5.3.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kat-co/vala v0.0.0-20170210184112-42e1d8b61f12
 	github.com/lib/pq v1.10.6
-	github.com/satori/go.uuid v1.2.0
 	github.com/spf13/viper v1.12.0
 	github.com/volatiletech/null/v8 v8.1.2
 	github.com/volatiletech/randomize v0.0.1
@@ -22,9 +23,7 @@ require (
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.11.2 // indirect
 	github.com/goccy/go-json v0.10.0 // indirect
-	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

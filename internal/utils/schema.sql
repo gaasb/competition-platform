@@ -54,7 +54,7 @@ create table if not exists teams(
 create table if not exists matches(
     id bigint primary key generated always as identity,
     bracket_id uuid references brackets(id) on delete cascade,
-    round int not null check ( round % 2 = 0 ),
+    round int not null, --check ( round % 2 = 0 ),
     first_team bigint references teams(id) on DELETE set null on UPDATE cascade,
     second_team bigint references teams(id) on DELETE set null on UPDATE cascade,
     first_team_score int,

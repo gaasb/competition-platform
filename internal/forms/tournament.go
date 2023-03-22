@@ -18,7 +18,7 @@ import (
 
 const (
 	BRACKETS_LIMIT    = 5
-	BRACKETS_SIZE_MAX = 50
+	BRACKETS_SIZE_MAX = 15
 	BRACKETS_SIZE_MIN = 1
 )
 

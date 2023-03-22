@@ -1,13 +1,8 @@
 package forms
 
 import (
-	"context"
-	"database/sql"
-	"errors"
-	"fmt"
 	model "github.com/gaasb/competition-platform/internal/utils/boiler-models"
-	"math"
-	"time"
+	"github.com/volatiletech/null/v8"
 )
 
 type Team struct {
@@ -15,44 +10,17 @@ type Team struct {
 	Participants []*model.Participant
 }
 type Match struct {
-	Round           int
-	FirstTeam       Team
-	SecondTeam      Team
-	FirstTeamScore  int
-	SecondTeamScore int
-	StartOn         time.Time
-	Winner          *Team
+	Round           int        `json:"round" boil:"round"`
+	FirstTeam       null.Int64 `json:"first_team" boil:"first_team"`
+	SecondTeam      null.Int64 `json:"second_team" boil:"second_team"`
+	FirstTeamScore  null.Int64 `json:"first_team_score" boil:"first_team_score"`
+	SecondTeamScore null.Int64 `json:"second_team_score" boil:"second_team_score"`
+	StartOn         null.Time  `json:"start_on" boil:"start_on"`
+	Winner          null.Int64 `json:"winner" boil:"winner"`
 }
 
 type MatchForm struct {
-	FirstTeamScore  int
-	SecondTeamScore int
-}
-
-func (m *MatchForm) Create(ctx context.Context, db *sql.DB, bracketId string, teams []*model.Team) error {
-	var err error
-	var bracket *model.Bracket
-	if bracket, err = model.FindBracket(ctx, db, bracketId); err != nil {
-		return errors.New("no brackets yet")
-	}
-	// Verification
-	var rounds int
-	totalTeams := len(teams)
-	rounds = int(math.Pow(2, math.Round(math.Log2(float64(totalTeams)))))
-	remaind := rounds - totalTeams
-
-	fmt.Println(remaind)
-
-	switch bracket.TypeOf {
-	case model.BracketTypeSINGLE_ELIMINATION:
-
-	case model.BracketTypeDOUBLE_ELIMINATION:
-
-	case model.BracketTypeROUND_ROBIN:
-
-	default:
-		return errors.New("invalid bracket type")
-	}
-
-	return nil
+	Round           int `form:"round" json:"round"`
+	FirstTeamScore  int `form:"first_team_score" json:"first_team_score"`
+	SecondTeamScore int `form:"second_team_score" json:"second_team_score"`
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"log"
 	"math"
+	"math/rand"
 	"time"
 )
 
@@ -38,8 +39,9 @@ type Service interface {
 	AddParticipantTo(bracketId string, form forms.ParticipantForm, ctx context.Context) error
 	DeleteParticipantsBy(bracketId string, teamAlias string, ctx context.Context) error
 
-	//AddMatch(bracketId string, form forms.MatchForm, ) error
-	UpdateMatchBy(id int64, form forms.MatchForm, ctx context.Context) error
+	FindAllMatches(bracketId string, ctx context.Context) ([]*forms.Match, error)
+	GenerateMatchesFor(bracket *model.Bracket, ctx context.Context) error
+	UpdateMatchScoreBy(bracketId string, form forms.MatchForm, ctx context.Context) error
 }
 
 func (t TournamentService) FindAllTournaments(ctx context.Context) (any, error) {
@@ -142,19 +144,13 @@ func (t TournamentService) GetTournamentBy(id string, ctx context.Context) (*for
 func (t TournamentService) UpdateTournamentBy(id string, params forms.TournamentsUpdateForm, ctx context.Context) error {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return errors.New(utils.NoPermission)
-		}
-	} else {
-		return errors.New(utils.NoPermission)
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return err
 	}
 
 	var tournament *model.Tournament
-	var err error
-
 	if tournament, err = model.FindTournament(ctx, db, id); err != nil {
 		return errors.New("tournament not found")
 	}
@@ -201,17 +197,14 @@ func (t TournamentService) UpdateTournamentBy(id string, params forms.Tournament
 func (t TournamentService) DeleteTournamentBy(id string, ctx context.Context) error {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return errors.New(utils.NoPermission)
-		}
-	} else {
-		return errors.New(utils.NoPermission)
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return err
 	}
 
-	tournament, err := model.FindTournament(ctx, db, id)
+	var tournament *model.Tournament
+	tournament, err = model.FindTournament(ctx, db, id)
 	if err != nil {
 		return errors.New("There are no tournaments to delete")
 	}
@@ -230,18 +223,14 @@ func (t TournamentService) DeleteTournamentBy(id string, ctx context.Context) er
 func (t TournamentService) AddBracket(tournamentId string, form forms.BracketForm, ctx context.Context) (*model.Bracket, error) {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return nil, errors.New(utils.NoPermission)
-		}
-	} else {
+	var err error
 
-		return nil, errors.New(utils.NoPermission)
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return nil, err
 	}
 
-	tournament, err := model.FindTournament(ctx, db, tournamentId)
+	var tournament *model.Tournament
+	tournament, err = model.FindTournament(ctx, db, tournamentId)
 	if err != nil {
 		return nil, errors.New("There are no tournaments")
 	}
@@ -283,18 +272,13 @@ func (t TournamentService) AddBracket(tournamentId string, form forms.BracketFor
 func (t TournamentService) UpdateBracketStatus(bracketId string, status model.BracketStatus, ctx context.Context) error {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return errors.New(utils.NoPermission)
-		}
-	} else {
-		return errors.New(utils.NoPermission)
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return err
 	}
 
 	var bracket *model.Bracket
-	var err error
 
 	if bracket, err = model.FindBracket(ctx, db, bracketId); err != nil {
 		return errors.New("no brackets yet")
@@ -307,7 +291,7 @@ func (t TournamentService) UpdateBracketStatus(bracketId string, status model.Br
 	switch status {
 	case model.BracketStatusFinished:
 		if bracket.Status == model.BracketStatusFinished {
-
+			return errors.New(fmt.Sprintf("current status is %s", bracket.Status.String()))
 		}
 		bracket.Status = model.BracketStatusFinished
 
@@ -321,22 +305,14 @@ func (t TournamentService) UpdateBracketStatus(bracketId string, status model.Br
 
 		if int(totalTeams) >= 2 {
 			bracket.Status = model.BracketStatusLive
+			if err = t.GenerateMatchesFor(bracket, ctx); err != nil {
+				return err
+			}
 		} else {
 			return errors.New("the current number of teams is less than 2")
 		}
 	default:
 		return errors.New("unknown status")
-	}
-
-	if status == model.BracketStatusLive { //TODO CREATE MATCHES
-		var totalTeams int64
-		totalTeams, err = model.Teams(model.TeamWhere.BracketID.EQ(null.StringFrom(bracketId))).Count(ctx, db)
-
-		if bracket.MaxTeams.Int <= int(totalTeams) {
-			bracket.Status = model.BracketStatusLive
-		} else {
-			return errors.New("the current number of teams is less than expected")
-		}
 	}
 
 	if _, err = bracket.Update(ctx, db, boil.Infer()); err != nil {
@@ -345,7 +321,7 @@ func (t TournamentService) UpdateBracketStatus(bracketId string, status model.Br
 	}
 	return nil
 
-} //TODO <---
+}
 
 func (t TournamentService) FindAllBracketsFrom(tournamentId string, ctx context.Context) ([]*forms.BracketsWithCount, error) {
 
@@ -370,23 +346,18 @@ func (t TournamentService) FindAllBracketsFrom(tournamentId string, ctx context.
 func (t TournamentService) DeleteBracket(bracketId string, ctx context.Context) error {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return errors.New(utils.NoPermission)
-		}
-	} else {
-		return errors.New(utils.NoPermission)
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return err
 	}
 
-	var err error
 	var bracket *model.Bracket
 	if bracket, err = model.FindBracket(ctx, db, bracketId); err != nil {
 		return errors.New("no brackets yet")
 	}
 
-	if err = verificationForBracket(userId, bracket, ctx); err != nil {
+	if err = verificationForBracketW(userId, bracket, ctx); err != nil {
 		return err
 	}
 
@@ -425,17 +396,12 @@ func (t TournamentService) FindAllParticipantFrom(bracketId string, ctx context.
 func (t TournamentService) AddTeamTo(bracketId string, teamAlias string, ctx context.Context) (*model.Team, error) {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return nil, errors.New(utils.NoPermission)
-		}
-	} else {
-		return nil, errors.New(utils.NoPermission)
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return nil, err
 	}
 
-	var err error
 	var bracket *model.Bracket
 	if bracket, err = model.FindBracket(ctx, db, bracketId); err != nil {
 		return nil, errors.New("no brackets yet")
@@ -456,14 +422,10 @@ func (t TournamentService) AddTeamTo(bracketId string, teamAlias string, ctx con
 func (t TournamentService) AddParticipantTo(bracketId string, form forms.ParticipantForm, ctx context.Context) error {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return errors.New(utils.NoPermission)
-		}
-	} else {
-		return errors.New(utils.NoPermission)
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return err
 	}
 
 	var isUpdate bool // TODO <----------------------------------------------------------
@@ -471,7 +433,6 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 		isUpdate = value
 	}
 
-	var err error
 	var bracket *model.Bracket
 	if bracket, err = model.FindBracket(ctx, db, bracketId); err != nil {
 		return errors.New("no brackets yet")
@@ -506,8 +467,8 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 	var teamId int64
 	if err = tx.QueryRow(
 		`INSERT INTO teams (team_alias, bracket_id) VALUES ($1, $2) RETURNING id`,
-		form.Team,
-		bracketId).Scan(&teamId); err != nil || isUpdate {
+		form.Team, bracketId).
+		Scan(&teamId); err != nil || isUpdate {
 		return errors.New("team is already in bracket")
 	}
 
@@ -538,17 +499,12 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 func (t TournamentService) DeleteParticipantsBy(bracketId string, teamAlias string, ctx context.Context) error {
 
 	var userId int64
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return errors.New(utils.NoPermission)
-		}
-	} else {
-		return errors.New(utils.NoPermission)
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return err
 	}
 
-	var err error
 	var bracket *model.Bracket
 	if bracket, err = model.FindBracket(ctx, db, bracketId); err != nil {
 		return errors.New("no brackets yet")
@@ -556,6 +512,10 @@ func (t TournamentService) DeleteParticipantsBy(bracketId string, teamAlias stri
 
 	if err = verificationForBracket(userId, bracket, ctx); err != nil {
 		return errors.New(utils.NoPermission)
+	}
+
+	if bracket.Status == model.BracketStatusLive {
+		return errors.New("cant delete because bracket is live")
 	}
 
 	var team *model.Team
@@ -570,24 +530,38 @@ func (t TournamentService) DeleteParticipantsBy(bracketId string, teamAlias stri
 	return nil
 }
 
-func (t TournamentService) UpdateMatchBy(id int64, form forms.MatchForm, ctx context.Context) error {
+func (t TournamentService) FindAllMatches(bracketId string, ctx context.Context) ([]*forms.Match, error) {
 
 	var err error
-	var userId int64
+	var matches []*forms.Match
 
-	if value := ctx.Value("user_id"); value != nil {
-		if validId, ok := value.(int64); ok {
-			userId = validId
-		} else {
-			return errors.New(utils.NoPermission)
-		}
-	} else {
-		return errors.New(utils.NoPermission)
+	if err = model.Matches(model.MatchWhere.BracketID.EQ(null.StringFrom(bracketId))).Bind(ctx, db, &matches); err != nil {
+		log.Println(err.Error())
+		return nil, errors.New("matches not found")
+	}
+	return matches, nil
+}
+
+func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.MatchForm, ctx context.Context) error {
+
+	var userId int64
+	var err error
+
+	if userId, err = verificationUserPermission(ctx); err != nil {
+		return err
 	}
 
 	var match *model.Match
-	if match, err = model.FindMatch(ctx, db, id); err != nil {
+	if match, err = model.Matches(model.MatchWhere.BracketID.EQ(null.StringFrom(bracketId)), model.MatchWhere.Round.EQ(form.Round)).One(ctx, db); err != nil {
 		return errors.New("no match yet")
+	}
+
+	if form.FirstTeamScore == form.SecondTeamScore {
+		return errors.New("the score should not to be the same")
+	}
+
+	if match.FirstTeam.IsZero() || match.SecondTeam.IsZero() {
+		return errors.New("one of the team field is empty")
 	}
 
 	var bracket *model.Bracket
@@ -610,35 +584,95 @@ func (t TournamentService) UpdateMatchBy(id int64, form forms.MatchForm, ctx con
 	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
 		return errors.New("failed on update match")
 	}
+
+	var totalTeams int64
+	if totalTeams, err = bracket.Teams().Count(ctx, db); err != nil {
+		return errors.New("some problem to count total team")
+	}
+	cR := math.Pow(2, math.Floor(math.Log2(float64(totalTeams))))
+
+	var nextMatch *model.Match
+	if nextMatch, err = model.Matches(model.MatchWhere.BracketID.EQ(null.StringFrom(bracketId)), model.MatchWhere.Round.EQ(match.Round+int(cR))).One(ctx, db); err != nil {
+		nextMatch = &model.Match{
+			BracketID: null.StringFrom(bracket.ID),
+			Round:     match.Round + int(cR),
+			FirstTeam: match.Winner,
+		}
+	} else {
+		nextMatch.SecondTeam = match.Winner
+	}
+
+	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
+		return errors.New("some problem to link next match")
+	}
+
 	//TODO Link to match with next round or create new match
 	return nil
 }
 
-func verificationForBracket(userId int64, bracket *model.Bracket, ctx context.Context) error {
+func (t TournamentService) GenerateMatchesFor(bracket *model.Bracket, ctx context.Context) error {
+
 	var err error
-	var tournament *model.Tournament
-
-	if tournament, err = bracket.Tournament().One(ctx, db); err != nil {
-		return errors.New("user verification error")
-	}
-	if err = verificationForTournament(userId, tournament); err != nil {
-		return err
+	//No verification because it is meant to be used in the method UpdateBracketStatus on start query.
+	var teams []*model.Team
+	if teams, err = bracket.Teams().All(ctx, db); err != nil {
+		log.Println(err.Error())
+		return errors.New("teams not found")
 	}
 
-	if bracket.Status.String() == model.BracketStatusFinished.String() {
-		return errors.New("cannot change status because bracket is finished")
-	}
-	return nil
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rnd.Shuffle(len(teams), func(i, j int) {
+		teams[i], teams[j] = teams[j], teams[i]
+	})
 
-}
+	var rounds int
+	totalTeams := len(teams)
+	rounds = int(math.Pow(2, math.Floor(math.Log2(float64(totalTeams)))))
+	remain := (totalTeams - rounds) * 2
+	toPlayoff := totalTeams - remain
 
-func verificationForTournament(userId int64, tournament *model.Tournament) error {
-	if tournament == nil || tournament.CreatedByUser.Int64 != userId {
-		return errors.New(utils.NoPermission)
+	if remain == 0 {
+		remain = rounds
 	}
 
-	if tournament.EndAt.Before(time.Now().UTC()) {
-		return errors.New("tournament is ended")
+	var tx *sql.Tx
+	if tx, err = db.BeginTx(ctx, nil); err != nil {
+		log.Println(err.Error())
+		return errors.New("some problems")
 	}
-	return nil
+
+	defer func() {
+		if err != nil {
+			if err = tx.Rollback(); err != nil {
+				log.Println(err.Error())
+				err = errors.New("some problems")
+			}
+			return
+		}
+		if err = tx.Commit(); err != nil {
+			log.Println(err.Error())
+			err = errors.New("some problems")
+		}
+	}()
+
+	switch bracket.TypeOf {
+	case model.BracketTypeSINGLE_ELIMINATION:
+
+		if err = genSingleElimination(totalTeams, toPlayoff, rounds, remain, bracket, teams, tx); err != nil {
+			return err
+		}
+
+	case model.BracketTypeDOUBLE_ELIMINATION:
+
+		if err = genSingleElimination(totalTeams, toPlayoff, rounds, remain, bracket, teams, tx); err != nil {
+			return err
+		}
+
+	case model.BracketTypeROUND_ROBIN:
+
+	default:
+		return errors.New("invalid bracket type")
+	}
+
+	return err
 }

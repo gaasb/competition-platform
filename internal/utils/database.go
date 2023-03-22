@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/volatiletech/sqlboiler/v4/boil"
 	"log"
 	"os"
 )
@@ -27,7 +26,8 @@ func setupDatabase() {
 
 	db, err := sql.Open(DB_DRIVER, dsn)
 	dieIf(err)
-	boil.SetDB(db)
+
+	//boil.SetDB(db)
 
 	err = db.Ping()
 	dieIf(err)

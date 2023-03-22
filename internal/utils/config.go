@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv"
+	"github.com/spf13/viper"
 	"log"
 )
 
@@ -21,4 +22,8 @@ func Init() {
 
 	setupDatabase()
 	log.Println("Successfully connected to database!")
+}
+
+func boilerSetup() {
+	viper.GetViper()
 }
