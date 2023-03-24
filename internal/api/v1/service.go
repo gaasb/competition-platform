@@ -440,12 +440,42 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 	if err = verificationForBracket(userId, bracket, ctx); err != nil {
 		return err
 	}
+
 	if len(form.Participants) != bracket.MaxTeamParticipants {
 		return errors.New("the number of participants should be equal to bracket max participants")
 	}
 
 	if bracket.Status != model.BracketStatusPending {
 		return errors.New(fmt.Sprintf("bracket is %s", bracket.Status.String()))
+	}
+
+	if isUpdate {
+
+		var team *model.Team
+		if team, err = bracket.Teams(model.TeamWhere.TeamAlias.EQ(form.Team)).One(ctx, db); err != nil {
+			return errors.New("team not found")
+		}
+
+		var participants model.ParticipantSlice
+		if participants, err = team.Participants(qm.Limit(bracket.MaxTeamParticipants)).All(ctx, db); err != nil {
+			return errors.New("participants is empty")
+		}
+
+		if len(participants) != len(form.Participants) {
+			return errors.New("the number of participants should be equal to bracket max participants")
+		}
+
+		for i, _ := range participants {
+
+			participants[i].UserAlias = form.Participants[i].UserAlias
+			participants[i].Contact = null.StringFrom(form.Participants[i].Contact)
+
+			if _, err = participants[i].Update(ctx, db, boil.Infer()); err != nil {
+				return errors.New("problem to update participant")
+			}
+		}
+
+		return nil
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -590,23 +620,32 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		return errors.New("some problem to count total team")
 	}
 	cR := math.Pow(2, math.Floor(math.Log2(float64(totalTeams))))
+	round := math.Pow(2, math.Floor(math.Log2(float64(match.Round/2))))
+	nextRound := match.Round + int(cR)
+	fmt.Println(cR)
+	fmt.Println(round, nextRound, int(cR+round)+match.Round)
+
+	if match.Round > int(cR) && nextRound%2 != 0 {
+		nextRound -= 1
+	}
 
 	var nextMatch *model.Match
-	if nextMatch, err = model.Matches(model.MatchWhere.BracketID.EQ(null.StringFrom(bracketId)), model.MatchWhere.Round.EQ(match.Round+int(cR))).One(ctx, db); err != nil {
+	if nextMatch, err = model.Matches(model.MatchWhere.BracketID.EQ(null.StringFrom(bracketId)), model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
 		nextMatch = &model.Match{
 			BracketID: null.StringFrom(bracket.ID),
-			Round:     match.Round + int(cR),
+			Round:     nextRound,
 			FirstTeam: match.Winner,
+		}
+		if err = nextMatch.Insert(ctx, db, boil.Infer()); err != nil {
+			return errors.New("some problem to link next match")
 		}
 	} else {
 		nextMatch.SecondTeam = match.Winner
+		if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
+			return errors.New("some problem to link next match")
+		}
 	}
 
-	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
-		return errors.New("some problem to link next match")
-	}
-
-	//TODO Link to match with next round or create new match
 	return nil
 }
 
