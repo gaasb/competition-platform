@@ -36,13 +36,13 @@ func (r *TournamentRouter) Setup(router *gin.Engine) {
 		bracket.DELETE(":id", handleDeleteBracket)      //✅
 		bracket.PATCH(":id", handleUpdateStatusBracket) //✅	?start=true end
 
-		bracket.GET("participants/:id/", handleGetAllParticipants) //TODO first_team and second_team изменить вывод id на team_alias
-		bracket.POST("participants/:id/", handleAddParticipant)    //✅			?update=true
-		bracket.DELETE("participants/:id/:team", handleDeleteParticipants)
+		bracket.GET("participants/:id/", handleGetAllParticipants)         //✅
+		bracket.POST("participants/:id/", handleAddParticipant)            //✅			?update=true
+		bracket.DELETE("participants/:id/:team", handleDeleteParticipants) //✅
 
 		match := v1.Group("/match")
 
-		match.GET(":bid", handleGetAllMatches)
+		match.GET(":bid", handleGetAllMatches) //✅
 		match.PATCH(":bid", handleUpdateMatchScore)
 
 	}

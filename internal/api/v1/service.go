@@ -40,7 +40,7 @@ type Service interface {
 	DeleteParticipantsBy(bracketId string, teamAlias string, ctx context.Context) error
 
 	FindAllMatches(bracketId string, ctx context.Context) ([]*forms.Match, error)
-	GenerateMatchesFor(bracket *model.Bracket, ctx context.Context) error
+	GenEliMatch(bracket *model.Bracket, ctx context.Context) error
 	UpdateMatchScoreBy(bracketId string, form forms.MatchForm, ctx context.Context) error
 }
 
@@ -305,7 +305,7 @@ func (t TournamentService) UpdateBracketStatus(bracketId string, status model.Br
 
 		if int(totalTeams) >= 2 {
 			bracket.Status = model.BracketStatusLive
-			if err = t.GenerateMatchesFor(bracket, ctx); err != nil {
+			if err = t.GenEliMatch(bracket, ctx); err != nil {
 				return err
 			}
 		} else {
@@ -372,18 +372,29 @@ func (t TournamentService) DeleteBracket(bracketId string, ctx context.Context) 
 func (t TournamentService) FindAllParticipantFrom(bracketId string, ctx context.Context) ([]forms.ParticipantsFromTeam, error) {
 
 	var err error
+
 	var bracket *model.Bracket
 	if bracket, err = model.FindBracket(ctx, db, bracketId); err != nil {
 		return nil, errors.New("no brackets yet")
 	}
-	//fmt.Println(*bracket.Teams(qm.Select("team_alias"), qm.Load(model.TeamRels.Participants)).)
+
 	var teams []*model.Team
-	teams, err = bracket.Teams(qm.Load(model.TeamRels.Participants)).All(ctx, db)
+	if teams, err = bracket.Teams().All(ctx, db); err != nil {
+		return nil, errors.New("teams is empty")
+	}
 
 	output := make([]forms.ParticipantsFromTeam, len(teams))
+
 	for i, item := range teams {
+
+		var participants []*forms.Participant
+		if err = item.Participants().Bind(ctx, db, &participants); err != nil {
+			log.Println(err.Error())
+			return nil, errors.New("participants not found")
+		}
 		output[i].Team = item.TeamAlias
-		output[i].Participants = item.R.Participants
+		output[i].Participants = participants
+
 	}
 
 	if err != nil {
@@ -428,7 +439,7 @@ func (t TournamentService) AddParticipantTo(bracketId string, form forms.Partici
 		return err
 	}
 
-	var isUpdate bool // TODO <----------------------------------------------------------
+	var isUpdate bool
 	if value, ok := ctx.Value("update").(bool); ok {
 		isUpdate = value
 	}
@@ -563,12 +574,24 @@ func (t TournamentService) DeleteParticipantsBy(bracketId string, teamAlias stri
 func (t TournamentService) FindAllMatches(bracketId string, ctx context.Context) ([]*forms.Match, error) {
 
 	var err error
-	var matches []*forms.Match
 
-	if err = model.Matches(model.MatchWhere.BracketID.EQ(null.StringFrom(bracketId))).Bind(ctx, db, &matches); err != nil {
+	var bracket *model.Bracket
+	if bracket, err = model.FindBracket(ctx, db, bracketId, model.BracketColumns.ID); err != nil {
+		return nil, errors.New("bracket not found")
+	}
+
+	var matches []*forms.Match
+	if err = queries.Raw(`select m.round, t1.team_alias first_team, t2.team_alias second_team, m.first_team_score, m.second_team_score, m.start_on, t3.team_alias team_winner
+from matches m 
+    LEFT OUTER JOIN teams t1 on t1.id = m.first_team 
+    LEFT OUTER JOIN teams t2 on t2.id = m.second_team
+    LEFT OUTER JOIN teams t3 on t3.id = m.winner
+where m.bracket_id = $1;`, bracket.ID).
+		Bind(ctx, db, &matches); err != nil {
 		log.Println(err.Error())
 		return nil, errors.New("matches not found")
 	}
+
 	return matches, nil
 }
 
@@ -602,9 +625,16 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		return err
 	}
 
+	var totalTeams int64
+	if totalTeams, err = bracket.Teams().Count(ctx, db); err != nil {
+		return errors.New("some problem to count total team")
+	}
+	rounds := int(math.Pow(2, math.Floor(math.Log2(float64(totalTeams)))))
+
 	match.FirstTeamScore = null.IntFrom(form.FirstTeamScore)
 	match.SecondTeamScore = null.IntFrom(form.SecondTeamScore)
 
+	//set winner
 	if form.FirstTeamScore > form.SecondTeamScore {
 		match.Winner = match.FirstTeam
 	} else {
@@ -615,41 +645,54 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		return errors.New("failed on update match")
 	}
 
-	var totalTeams int64
-	if totalTeams, err = bracket.Teams().Count(ctx, db); err != nil {
-		return errors.New("some problem to count total team")
+	if match.Round >= rounds*2-2 {
+		return nil
 	}
-	cR := math.Pow(2, math.Floor(math.Log2(float64(totalTeams))))
-	round := math.Pow(2, math.Floor(math.Log2(float64(match.Round/2))))
-	nextRound := match.Round + int(cR)
-	fmt.Println(cR)
-	fmt.Println(round, nextRound, int(cR+round)+match.Round)
 
-	if match.Round > int(cR) && nextRound%2 != 0 {
-		nextRound -= 1
+	var nextRound int
+
+	if match.Round < rounds {
+		nextRound = match.Round + rounds
+	} else {
+		position := match.Round - rounds
+		position -= position % 2
+		position = position / 2
+		nextRound = ((rounds / 2) + position) + rounds
 	}
 
 	var nextMatch *model.Match
-	if nextMatch, err = model.Matches(model.MatchWhere.BracketID.EQ(null.StringFrom(bracketId)), model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
+	if nextMatch, err = bracket.Matches(model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
+
 		nextMatch = &model.Match{
 			BracketID: null.StringFrom(bracket.ID),
 			Round:     nextRound,
 			FirstTeam: match.Winner,
 		}
+
 		if err = nextMatch.Insert(ctx, db, boil.Infer()); err != nil {
 			return errors.New("some problem to link next match")
 		}
+		return nil
+	}
+
+	if !nextMatch.Winner.IsZero() {
+		return errors.New("cant update because in linked match winner is already")
+	}
+
+	if match.Round%2 == 0 {
+		nextMatch.FirstTeam = match.Winner
 	} else {
 		nextMatch.SecondTeam = match.Winner
-		if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
-			return errors.New("some problem to link next match")
-		}
+	}
+
+	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
+		return errors.New("some problem to update next match")
 	}
 
 	return nil
 }
 
-func (t TournamentService) GenerateMatchesFor(bracket *model.Bracket, ctx context.Context) error {
+func (t TournamentService) GenEliMatch(bracket *model.Bracket, ctx context.Context) error {
 
 	var err error
 	//No verification because it is meant to be used in the method UpdateBracketStatus on start query.
