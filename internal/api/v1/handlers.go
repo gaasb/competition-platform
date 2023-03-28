@@ -56,9 +56,7 @@ func handleNewTournament(ctx *gin.Context) {
 		return
 	}
 
-	//var tournament *forms.TournamentsForm
-
-	if err = form.Create(db, ctx); err != nil {
+	if err = service.AddTournament(form, ctx); err != nil {
 		ctx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			respMsg(ERR, nil, err.Error()))

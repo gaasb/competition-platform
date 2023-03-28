@@ -8,6 +8,7 @@ import (
 	"github.com/gaasb/competition-platform/internal/forms"
 	"github.com/gaasb/competition-platform/internal/utils"
 	model "github.com/gaasb/competition-platform/internal/utils/boiler-models"
+	"github.com/gin-gonic/gin"
 	"github.com/gofrs/uuid"
 	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -24,6 +25,7 @@ var db *sql.DB
 type TournamentService struct{}
 
 type Service interface {
+	AddTournament(form *forms.TournamentsForm, ctx *gin.Context) error
 	FindAllTournaments(ctx context.Context) (any, error)
 	GetTournamentBy(id string, ctx context.Context) (*forms.Tournament, error)
 	UpdateTournamentBy(id string, params forms.TournamentsUpdateForm, ctx context.Context) error
@@ -42,6 +44,46 @@ type Service interface {
 	FindAllMatches(bracketId string, ctx context.Context) ([]*forms.Match, error)
 	GenEliMatch(bracket *model.Bracket, ctx context.Context) error
 	UpdateMatchScoreBy(bracketId string, form forms.MatchForm, ctx context.Context) error
+}
+
+func (t TournamentService) AddTournament(form *forms.TournamentsForm, ctx *gin.Context) error {
+
+	var userId int64
+	rawId, hasValue := ctx.Get("user_id")
+	if !hasValue {
+		return errors.New(utils.NoPermission)
+	}
+	if value, ok := rawId.(int64); ok {
+		userId = value
+	} else {
+		return errors.New(utils.NoPermission)
+	}
+
+	id, err := uuid.NewV6()
+	if err != nil {
+		log.Println(err.Error())
+		return errors.New("problem on generation uuid")
+	}
+	form.Id = id.String()
+
+	tournament := model.Tournament{
+		ID:            form.Id,
+		SportName:     form.DisciplineName,
+		Title:         form.Title,
+		StartAt:       form.StartAt.UTC(),
+		EndAt:         form.EndAt.UTC(),
+		Description:   form.Description,
+		CreatedByUser: null.Int64From(userId),
+		BracketsLimit: forms.BRACKETS_LIMIT,
+	}
+
+	if err = tournament.Insert(ctx, db, boil.Infer()); err != nil {
+		log.Println(err.Error())
+		return errors.New("invalid data")
+	}
+
+	return nil
+
 }
 
 func (t TournamentService) FindAllTournaments(ctx context.Context) (any, error) {
