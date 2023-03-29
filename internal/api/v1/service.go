@@ -96,9 +96,9 @@ func (t TournamentService) FindAllTournaments(ctx context.Context) (any, error) 
 	case limit == 0:
 		limit = forms.BRACKETS_SIZE_MIN
 	case limit < forms.BRACKETS_SIZE_MIN:
-		return nil, errors.New(fmt.Sprintf("limit cannot be less than 1 %s", forms.BRACKETS_SIZE_MAX))
+		return nil, errors.New(fmt.Sprintf("limit cannot be less than 1 %d", forms.BRACKETS_SIZE_MAX))
 	case limit > forms.BRACKETS_SIZE_MAX:
-		return nil, errors.New(fmt.Sprintf("limit cannot be greater than %s", forms.BRACKETS_SIZE_MAX))
+		return nil, errors.New(fmt.Sprintf("limit cannot be greater than %d", forms.BRACKETS_SIZE_MAX))
 	case currentPage < 0:
 		return nil, errors.New("page must be positive")
 	case prevPage < 0:
@@ -671,36 +671,53 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 	if totalTeams, err = bracket.Teams().Count(ctx, db); err != nil {
 		return errors.New("some problem to count total team")
 	}
+
 	rounds := int(math.Pow(2, math.Floor(math.Log2(float64(totalTeams)))))
 
 	match.FirstTeamScore = null.IntFrom(form.FirstTeamScore)
 	match.SecondTeamScore = null.IntFrom(form.SecondTeamScore)
 
+	var loserTeam int64
+	var winnerTeam int64
 	//set winner
 	if form.FirstTeamScore > form.SecondTeamScore {
-		match.Winner = match.FirstTeam
+		winnerTeam = match.FirstTeam.Int64
+		loserTeam = match.SecondTeam.Int64
 	} else {
-		match.Winner = match.SecondTeam
+		winnerTeam = match.SecondTeam.Int64
+		loserTeam = match.FirstTeam.Int64
 	}
+	match.Winner = null.Int64From(winnerTeam)
 
 	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
 		return errors.New("failed on update match")
 	}
 
-	if match.Round >= rounds*2-2 {
+	currentRound := int(math.Abs(float64(match.Round)))
+
+	if currentRound >= rounds*2-2 {
 		return nil
 	}
 
 	var nextRound int
+	var position int
+	position = currentRound - rounds
+	position -= position % 2 //if position%2 != 0 { position -= 1 }
+	position = position / 2
 
-	if match.Round < rounds {
-		nextRound = match.Round + rounds
+	a := rounds - (int(totalTeams) - rounds)
+	b := int(totalTeams) - rounds
+	if currentRound < int(math.Min(float64(a), float64(b))) {
+		nextRound = currentRound + rounds
 	} else {
-		position := match.Round - rounds
-		position -= position % 2
-		position = position / 2
 		nextRound = ((rounds / 2) + position) + rounds
 	}
+
+	if match.Round < 0 {
+		nextRound = 0 - nextRound
+	}
+
+	pos := match.Round
 
 	var nextMatch *model.Match
 	if nextMatch, err = bracket.Matches(model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
@@ -708,27 +725,83 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		nextMatch = &model.Match{
 			BracketID: null.StringFrom(bracket.ID),
 			Round:     nextRound,
-			FirstTeam: match.Winner,
+		}
+
+		if match.Round < rounds {
+			pos += 1
+		}
+
+		if pos%2 == 0 {
+			nextMatch.FirstTeam = match.Winner
+		} else {
+			nextMatch.SecondTeam = match.Winner
 		}
 
 		if err = nextMatch.Insert(ctx, db, boil.Infer()); err != nil {
 			return errors.New("some problem to link next match")
 		}
-		return nil
+
+		if bracket.TypeOf != model.BracketTypeDOUBLE_ELIMINATION {
+			return nil
+		}
+
+	}
+	if match.Round < rounds {
+		pos += 1
+	}
+	if pos%2 == 0 {
+		nextMatch.FirstTeam = match.Winner
+	} else {
+		nextMatch.SecondTeam = match.Winner
 	}
 
 	if !nextMatch.Winner.IsZero() {
 		return errors.New("cant update because in linked match winner is already")
 	}
 
-	if match.Round%2 == 0 {
-		nextMatch.FirstTeam = match.Winner
-	} else {
-		nextMatch.SecondTeam = match.Winner
-	}
-
 	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
 		return errors.New("some problem to update next match")
+	}
+
+	if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && match.Round >= 0 {
+
+		var nextLoserMatch *model.Match
+		if nextLoserMatch, err = bracket.Matches(model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
+
+			nextLoserMatch = &model.Match{
+				BracketID: null.StringFrom(bracket.ID),
+				Round:     nextRound,
+			}
+
+			if position%2 == 0 {
+				nextLoserMatch.FirstTeam = null.Int64From(loserTeam)
+			} else {
+				nextLoserMatch.SecondTeam = null.Int64From(loserTeam)
+			}
+
+			if err = nextLoserMatch.Insert(ctx, db, boil.Infer()); err != nil {
+				return errors.New("some problem to link next loser match")
+			}
+			return nil
+		}
+
+		if !nextLoserMatch.Winner.IsZero() {
+			return errors.New("cant update because in linked match winner is already")
+		}
+
+		if position%2 == 0 {
+			nextLoserMatch.FirstTeam = null.Int64From(loserTeam)
+		} else {
+			nextLoserMatch.SecondTeam = null.Int64From(loserTeam)
+		}
+
+		if _, err = nextLoserMatch.Update(ctx, db, boil.Infer()); err != nil {
+			return errors.New("some problem to update next match")
+		}
+	}
+
+	if nextRound == rounds*2-2 {
+		//TODO конец сетки последний лузер вс последний винер
 	}
 
 	return nil
