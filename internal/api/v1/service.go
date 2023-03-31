@@ -688,22 +688,21 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		loserTeam = match.FirstTeam.Int64
 	}
 	match.Winner = null.Int64From(winnerTeam)
-	//update scores and winner for current round
-	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
-		return errors.New("failed on update match")
-	}
 
 	currentRound := int(math.Abs(float64(match.Round)))
 	//if round counting to final just update score and return else create next round for the expected results
 	if currentRound >= rounds*2-2 {
+		if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
+			return errors.New("failed on update match")
+		}
 		return nil
 	}
 
 	var (
 		nextRound, position int
-		isFirst             = true
+		isFirst             bool
 	)
-	position = currentRound - rounds
+	position = int(math.Abs(float64(currentRound - rounds))) //currentRound might greater than rounds this why used abs
 
 	a := rounds - (int(totalTeams) - rounds)
 	b := int(totalTeams) - rounds
@@ -711,9 +710,12 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 
 	//counting before rounds
 	if currentRound < rounds {
+
 		if currentRound < res {
+			isFirst = false
 			nextRound = currentRound + rounds
 		} else {
+			isFirst = true
 			position = currentRound
 			//sets position to even number
 			if totalTeams%2 != 0 {
@@ -735,6 +737,7 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		}
 	} else {
 		//counting after rounds
+		isFirst = false
 		if position%2 != 0 {
 			position -= 1
 		}
@@ -747,8 +750,6 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		nextRound = 0 - nextRound
 	}
 
-	pos := match.Round
-
 	var nextMatch *model.Match
 	if nextMatch, err = bracket.Matches(model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
 
@@ -757,18 +758,22 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 			Round:     nextRound,
 		}
 
-		if isFirst {
-			//nextMatch =
-		}
-
-		if match.Round < rounds {
-			pos += 1
-		}
-
-		if pos%2 == 0 {
-			nextMatch.FirstTeam = match.Winner
+		if currentRound < rounds {
+			if isFirst {
+				if currentRound%2 != 0 {
+					nextMatch.FirstTeam = match.Winner
+				} else {
+					nextMatch.SecondTeam = match.Winner
+				}
+			} else {
+				nextMatch.FirstTeam = match.Winner
+			}
 		} else {
-			nextMatch.SecondTeam = match.Winner
+			if currentRound%2 != 0 {
+				nextMatch.FirstTeam = match.Winner
+			} else {
+				nextMatch.SecondTeam = match.Winner
+			}
 		}
 
 		if err = nextMatch.Insert(ctx, db, boil.Infer()); err != nil {
@@ -776,23 +781,40 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		}
 
 		if bracket.TypeOf != model.BracketTypeDOUBLE_ELIMINATION {
+			//update scores and winner for current round
+			if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
+				return errors.New("failed on update match")
+			}
 			return nil
 		}
-
 	}
-	if match.Round < rounds {
-		pos += 1
-	}
-	if pos%2 == 0 {
-		nextMatch.FirstTeam = match.Winner
-	} else {
-		nextMatch.SecondTeam = match.Winner
-	}
-
 	if !nextMatch.Winner.IsZero() {
 		return errors.New("cant update because in linked match winner is already")
 	}
+	//update scores and winner for current round
+	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
+		return errors.New("failed on update match")
+	}
 
+	if currentRound < rounds {
+		if isFirst {
+			if currentRound%2 != 0 {
+				nextMatch.FirstTeam = match.Winner
+			} else {
+				nextMatch.SecondTeam = match.Winner
+			}
+		} else {
+			nextMatch.SecondTeam = match.Winner
+		}
+		//nextMatch.SecondTeam = match.Winner
+	} else {
+		if currentRound%2 != 0 {
+			nextMatch.FirstTeam = match.Winner
+		} else {
+			nextMatch.SecondTeam = match.Winner
+		}
+	}
+	//update scores and winner for next round
 	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
 		return errors.New("some problem to update next match")
 	}
