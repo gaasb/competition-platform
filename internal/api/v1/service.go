@@ -679,7 +679,7 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 
 	var loserTeam int64
 	var winnerTeam int64
-	//set winner
+	//sets winner
 	if form.FirstTeamScore > form.SecondTeamScore {
 		winnerTeam = match.FirstTeam.Int64
 		loserTeam = match.SecondTeam.Int64
@@ -688,31 +688,61 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		loserTeam = match.FirstTeam.Int64
 	}
 	match.Winner = null.Int64From(winnerTeam)
-
+	//update scores and winner for current round
 	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
 		return errors.New("failed on update match")
 	}
 
 	currentRound := int(math.Abs(float64(match.Round)))
-
+	//if round counting to final just update score and return else create next round for the expected results
 	if currentRound >= rounds*2-2 {
 		return nil
 	}
 
-	var nextRound int
-	var position int
+	var (
+		nextRound, position int
+		isFirst             = true
+	)
 	position = currentRound - rounds
-	position -= position % 2 //if position%2 != 0 { position -= 1 }
-	position = position / 2
 
 	a := rounds - (int(totalTeams) - rounds)
 	b := int(totalTeams) - rounds
-	if currentRound < int(math.Min(float64(a), float64(b))) {
-		nextRound = currentRound + rounds
-	} else {
-		nextRound = ((rounds / 2) + position) + rounds
-	}
+	res := int(math.Min(float64(a), float64(b)))
 
+	//counting before rounds
+	if currentRound < rounds {
+		if currentRound < res {
+			nextRound = currentRound + rounds
+		} else {
+			position = currentRound
+			//sets position to even number
+			if totalTeams%2 != 0 {
+				if position%2 != 0 {
+					position += 1
+				}
+			} else {
+				if position%2 != 0 {
+					position -= 1
+				}
+			}
+			//get position from even number
+			position = position / 2
+			//sets next round
+			nextRound = (((res - 1) + rounds) / 2) + (position + (rounds / 2))
+			if totalTeams%2 == 0 {
+				nextRound += 1
+			}
+		}
+	} else {
+		//counting after rounds
+		if position%2 != 0 {
+			position -= 1
+		}
+		position = position / 2
+		nextRound = ((rounds / 2) + position) + rounds
+
+	}
+	//if bracket type is double eliminate this prepare the next round of the match for looser round
 	if match.Round < 0 {
 		nextRound = 0 - nextRound
 	}
@@ -725,6 +755,10 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		nextMatch = &model.Match{
 			BracketID: null.StringFrom(bracket.ID),
 			Round:     nextRound,
+		}
+
+		if isFirst {
+			//nextMatch =
 		}
 
 		if match.Round < rounds {
