@@ -775,7 +775,8 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 	//add loser to loser bracket
 	if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && match.Round >= 0 {
 
-		if currentRound > rounds+res && currentRound+2 < rounds*2 {
+		//or currentRound > rounds
+		if currentRound >= rounds+res && currentRound+2 < rounds*2 {
 			nextRound = currentRound + 2
 		}
 
@@ -937,9 +938,10 @@ func updateScore(bracket *model.Bracket, match *model.Match, winnerOrLoser null.
 	}
 
 	//TODO Possible bug. Check if !nextMatch.Winner.IsZero() in minus match(-)
-	if !nextMatch.Winner.IsZero() {
-		return errors.New("cant update because in linked match winner is already"), false
-	}
+	//if !nextMatch.Winner.IsZero() {
+	//	return errors.New("cant update because in linked match winner is already"), false
+	//}
+
 	//update scores and winner for current round
 	//TODO UNCOMMENT
 	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
