@@ -4,6 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"math"
+	"math/rand"
+	"time"
+
 	"github.com/friendsofgo/errors"
 	"github.com/gaasb/competition-platform/internal/forms"
 	"github.com/gaasb/competition-platform/internal/utils"
@@ -14,10 +19,6 @@ import (
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
-	"log"
-	"math"
-	"math/rand"
-	"time"
 )
 
 var db *sql.DB
@@ -691,7 +692,7 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 
 	currentRound := int(math.Abs(float64(match.Round)))
 	//if round counting to final just update score and return else create next round for the expected results
-	if currentRound >= rounds*2-2 {
+	if (currentRound >= rounds*2-2 && bracket.TypeOf == model.BracketTypeSINGLE_ELIMINATION) || (currentRound >= rounds*2 && bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION) {
 		if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
 			return errors.New("failed on update match")
 		}
@@ -714,6 +715,7 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		if currentRound < res {
 			isFirst = false
 			nextRound = currentRound + rounds
+
 		} else {
 			isFirst = true
 			position = currentRound
@@ -745,120 +747,57 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 		nextRound = ((rounds / 2) + position) + rounds
 
 	}
-	//if bracket type is double eliminate this prepare the next round of the match for looser round
-	if match.Round < 0 {
-		nextRound = 0 - nextRound
-	}
-
-	var nextMatch *model.Match
-	if nextMatch, err = bracket.Matches(model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
-
-		nextMatch = &model.Match{
-			BracketID: null.StringFrom(bracket.ID),
-			Round:     nextRound,
+	//TODO
+	//manipulating in loser bracket
+	//advance winner from loser bracket next
+	if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && match.Round < 0 {
+		if currentRound > rounds && currentRound <= rounds+res && res != 0 {
+			nextRound = currentRound - res //or currentRound - (currentRound - rounds)
 		}
 
-		if currentRound < rounds {
-			if isFirst {
-				if currentRound%2 != 0 {
-					nextMatch.FirstTeam = match.Winner
-				} else {
-					nextMatch.SecondTeam = match.Winner
-				}
-			} else {
-				nextMatch.FirstTeam = match.Winner
-			}
-		} else {
-			if currentRound%2 != 0 {
-				nextMatch.FirstTeam = match.Winner
-			} else {
-				nextMatch.SecondTeam = match.Winner
-			}
-		}
-
-		if err = nextMatch.Insert(ctx, db, boil.Infer()); err != nil {
-			return errors.New("some problem to link next match")
-		}
-
-		if bracket.TypeOf != model.BracketTypeDOUBLE_ELIMINATION {
-			//update scores and winner for current round
-			if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
-				return errors.New("failed on update match")
-			}
-			return nil
+		if currentRound == rounds*2-1 {
+			nextRound = currentRound + 1
 		}
 	}
-	if !nextMatch.Winner.IsZero() {
-		return errors.New("cant update because in linked match winner is already")
-	}
-	//update scores and winner for current round
-	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
-		return errors.New("failed on update match")
+	if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && currentRound == rounds*2-1 && match.Round > 0 {
+		nextRound = currentRound + 1
 	}
 
-	if currentRound < rounds {
-		if isFirst {
-			if currentRound%2 != 0 {
-				nextMatch.FirstTeam = match.Winner
-			} else {
-				nextMatch.SecondTeam = match.Winner
-			}
-		} else {
-			nextMatch.SecondTeam = match.Winner
-		}
-		//nextMatch.SecondTeam = match.Winner
-	} else {
-		if currentRound%2 != 0 {
-			nextMatch.FirstTeam = match.Winner
-		} else {
-			nextMatch.SecondTeam = match.Winner
-		}
-	}
-	//update scores and winner for next round
-	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
-		return errors.New("some problem to update next match")
+	var isReturn bool
+	if err, isReturn = updateScore(bracket, match, match.Winner, ctx, rounds, currentRound, nextRound, res, isFirst); err != nil || isReturn {
+		return err
 	}
 
+	//if match.Round < 0 {
+	//	return nil
+	//}
+	//TODO
+	//add loser to loser bracket
 	if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && match.Round >= 0 {
 
-		var nextLoserMatch *model.Match
-		if nextLoserMatch, err = bracket.Matches(model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
-
-			nextLoserMatch = &model.Match{
-				BracketID: null.StringFrom(bracket.ID),
-				Round:     nextRound,
-			}
-
-			if position%2 == 0 {
-				nextLoserMatch.FirstTeam = null.Int64From(loserTeam)
-			} else {
-				nextLoserMatch.SecondTeam = null.Int64From(loserTeam)
-			}
-
-			if err = nextLoserMatch.Insert(ctx, db, boil.Infer()); err != nil {
-				return errors.New("some problem to link next loser match")
-			}
-			return nil
+		if currentRound > rounds+res && currentRound+2 < rounds*2 {
+			nextRound = currentRound + 2
 		}
 
-		if !nextLoserMatch.Winner.IsZero() {
-			return errors.New("cant update because in linked match winner is already")
+		if currentRound >= rounds && currentRound < rounds+res {
+			nextRound = currentRound
+		}
+		if currentRound < res {
+			nextRound = ((rounds * 2) - 2) - currentRound
 		}
 
-		if position%2 == 0 {
-			nextLoserMatch.FirstTeam = null.Int64From(loserTeam)
-		} else {
-			nextLoserMatch.SecondTeam = null.Int64From(loserTeam)
-		}
+		//if currentRound < res {
+		//	nextRound = (rounds*2 - res) + currentRound
+		//}
 
-		if _, err = nextLoserMatch.Update(ctx, db, boil.Infer()); err != nil {
-			return errors.New("some problem to update next match")
+		if err, isReturn = updateScore(bracket, match, null.Int64From(loserTeam), ctx, rounds, currentRound, 0-nextRound, res, isFirst); err != nil || isReturn {
+			return err
 		}
 	}
 
-	if nextRound == rounds*2-2 {
-		//TODO конец сетки последний лузер вс последний винер
-	}
+	//if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
+	//	return errors.New("failed on update match")
+	//}
 
 	return nil
 }
@@ -928,4 +867,119 @@ func (t TournamentService) GenEliMatch(bracket *model.Bracket, ctx context.Conte
 	}
 
 	return err
+}
+
+func updateScore(bracket *model.Bracket, match *model.Match, winnerOrLoser null.Int64, ctx context.Context, rounds, currentRound, nextRound, res int, isFirst bool) (error, bool) {
+
+	//if bracket type is double eliminate this prepare the next round of the match for looser round
+	if match.Round < 0 {
+		nextRound = 0 - nextRound
+	}
+
+	var err error
+	var nextMatch *model.Match
+
+	//if nextRound == rounds*2-2 {
+	//	if match.Round < 0 {
+	//		nextMatch.SecondTeam = match.Winner
+	//	} else {
+	//		nextMatch.FirstTeam = match.Winner
+	//	}
+	//	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
+	//		return errors.New("some problem to update next match"), true
+	//	}
+	//	return nil, true
+	//}
+
+	if nextMatch, err = bracket.Matches(model.MatchWhere.Round.EQ(nextRound)).One(ctx, db); err != nil {
+
+		nextMatch = &model.Match{
+			BracketID: null.StringFrom(bracket.ID),
+			Round:     nextRound,
+		}
+
+		if currentRound < rounds {
+
+			if isFirst {
+				if currentRound%2 != 0 {
+					nextMatch.FirstTeam = winnerOrLoser
+				} else {
+					nextMatch.SecondTeam = winnerOrLoser
+				}
+			} else {
+				nextMatch.FirstTeam = winnerOrLoser
+			}
+		} else {
+			if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && currentRound < rounds+res && nextRound < 0 {
+				nextMatch.SecondTeam = winnerOrLoser
+			} else {
+				if currentRound%2 != 0 {
+					nextMatch.FirstTeam = winnerOrLoser
+				} else {
+					nextMatch.SecondTeam = winnerOrLoser
+				}
+			}
+
+		}
+
+		if err = nextMatch.Insert(ctx, db, boil.Infer()); err != nil {
+			return errors.New("some problem to link next match"), false
+		}
+		//update scores and winner for current round
+		if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
+			return errors.New("failed on update match"), false
+		}
+
+		if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION {
+			return nil, false
+		}
+		return nil, true
+	}
+
+	//TODO Possible bug. Check if !nextMatch.Winner.IsZero() in minus match(-)
+	if !nextMatch.Winner.IsZero() {
+		return errors.New("cant update because in linked match winner is already"), false
+	}
+	//update scores and winner for current round
+	//TODO UNCOMMENT
+	if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
+		return errors.New("failed on update match"), false
+	}
+
+	if currentRound < rounds {
+		if isFirst {
+			if currentRound%2 != 0 {
+				nextMatch.FirstTeam = winnerOrLoser
+			} else {
+				nextMatch.SecondTeam = winnerOrLoser
+			}
+		} else {
+			if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && currentRound < res && nextRound < 0 {
+				nextMatch.FirstTeam = winnerOrLoser
+			} else {
+				nextMatch.SecondTeam = winnerOrLoser
+			}
+		}
+		//nextMatch.SecondTeam = match.Winner
+	} else {
+		if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && currentRound < rounds+res && nextRound < 0 {
+			nextMatch.SecondTeam = winnerOrLoser
+		} else {
+			if currentRound%2 != 0 {
+				nextMatch.FirstTeam = winnerOrLoser
+			} else {
+				nextMatch.SecondTeam = winnerOrLoser
+			}
+		}
+
+	}
+	//update scores and winner for next round
+	if _, err = nextMatch.Update(ctx, db, boil.Infer()); err != nil {
+		return errors.New("some problem to update next match"), false
+	}
+
+	if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION {
+		return nil, false
+	}
+	return nil, true
 }
