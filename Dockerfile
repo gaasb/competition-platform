@@ -1,9 +1,9 @@
-FROM golang:1.20.0
+FROM golang:latest AS build
 WORKDIR /app
 COPY go.mod go.sum ./
-RUN go mod download && go mode verify
+RUN go mod download && go mod verify
 COPY . .
-RUN go build -v -o app/bin/app ./...
+RUN CGO_ENABLED=0 go build -v -o ./bin/build ./...
 
-CMD ["/app/bin/app", "port"]
-# RUN go mod tidy
+FROM alpine:latest AS prod
+CMD ["/app/bin/prod", "port"]
