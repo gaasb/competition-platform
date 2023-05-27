@@ -2,14 +2,15 @@ package v1
 
 import (
 	"context"
-	"github.com/gaasb/competition-platform/internal/middleware"
-	"github.com/gaasb/competition-platform/internal/utils"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/gaasb/competition-platform/internal/middleware"
+	"github.com/gaasb/competition-platform/internal/utils"
+	"github.com/gin-gonic/gin"
 )
 
 type ApiServer struct {
@@ -29,6 +30,7 @@ func NewServer(service Service) *ApiServer {
 func (s *ApiServer) Start() {
 
 	utils.Init()
+	middleware.InitJwtSecret()
 	utils.SetupValidator()
 	db = utils.GetDB()
 	router := gin.Default()
