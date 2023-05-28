@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/gaasb/competition-platform/internal/middleware"
+	"github.com/gaasb/competition-platform/internal/auth"
 	"github.com/gaasb/competition-platform/internal/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -18,11 +18,12 @@ type ApiServer struct {
 	router  Router
 }
 
-func NewServer(service Service) *ApiServer {
+func NewServer(service Service, router Router) *ApiServer {
 
 	return &ApiServer{
 		service: service,
-		router:  &TournamentRouter{},
+		router:  router,
+		// router:  &TournamentRouter{},
 	}
 
 }
@@ -30,7 +31,7 @@ func NewServer(service Service) *ApiServer {
 func (s *ApiServer) Start() {
 
 	utils.Init()
-	middleware.InitJwtSecret()
+	auth.InitJwtSecret()
 	utils.SetupValidator()
 	db = utils.GetDB()
 	router := gin.Default()
@@ -38,7 +39,6 @@ func (s *ApiServer) Start() {
 	router.Use(
 		gin.Recovery(),
 		gin.Logger(),
-		middleware.Jwt(),
 	)
 	s.router.Setup(router)
 

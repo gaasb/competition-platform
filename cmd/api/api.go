@@ -7,7 +7,7 @@ import (
 func main() {
 
 	service := v1.TournamentService{}
-	server := v1.NewServer(service)
+	server := v1.NewServer(service, &v1.TournamentRouter{})
 
 	server.Start()
 }

@@ -764,8 +764,14 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 	}
 
 	var isReturn bool
-	if err, isReturn = updateScore(bracket, match, match.Winner, ctx, rounds, currentRound, nextRound, res, isFirst); err != nil || isReturn {
-		return err
+	skip := match.Round > 0 && bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && currentRound >= (rounds*2)-2
+	if !skip {
+		if err, isReturn = updateScore(bracket, match, match.Winner, ctx, rounds, currentRound, nextRound, res, isFirst); err != nil || isReturn {
+			return err
+		}
+		//if _, err = match.Update(ctx, db, boil.Infer()); err != nil {
+		//	return errors.New("failed on update match"), false
+		//}
 	}
 
 	//if match.Round < 0 {
@@ -776,7 +782,7 @@ func (t TournamentService) UpdateMatchScoreBy(bracketId string, form forms.Match
 	if bracket.TypeOf == model.BracketTypeDOUBLE_ELIMINATION && match.Round >= 0 {
 
 		//or currentRound > rounds
-		if currentRound >= rounds+res && currentRound+2 < rounds*2 {
+		if currentRound > rounds && currentRound+2 <= rounds*2 {
 			nextRound = currentRound + 2
 		}
 
