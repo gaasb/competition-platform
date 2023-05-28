@@ -2,13 +2,14 @@ package v1
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/gaasb/competition-platform/internal/forms"
 	"github.com/gaasb/competition-platform/internal/utils"
 	model "github.com/gaasb/competition-platform/internal/utils/boiler-models"
 	"github.com/gin-gonic/gin"
 	"github.com/gofrs/uuid"
-	"net/http"
-	"strconv"
 )
 
 var service Service = TournamentService{}
@@ -34,14 +35,14 @@ func noRoute(ctx *gin.Context) {
 }
 
 func handleAllowMethods(ctx *gin.Context) {
-	login := false
 
-	if login {
+	if _, hasValue := ctx.Get("user_id"); hasValue {
 		ctx.Header("Allow", "GET, POST, PUT, DELETE")
-
-		return
+	} else {
+		ctx.Header("Allow", "GET")
 	}
-	ctx.Header("Allow", "GET")
+	ctx.Status(200)
+
 }
 
 func handleNewTournament(ctx *gin.Context) {
