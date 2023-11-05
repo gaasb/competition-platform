@@ -2,17 +2,11 @@
 ### Create and manage competition events.
 ### Requirement
 ```text
-go above 1.20
+golang 1.20
 Docker
 make
 ```
-### Quick Start
 
-```bash
-TBD !!! Not working
-make build
-make run
-```
 ### Available routes for REST API:
 Default response:
 ```json
@@ -26,7 +20,7 @@ Default response:
 ```
 
 `status` have only two states: `ok` and `error`.
-Possibles responses code: `200`, `400`, `401`, `404`
+Available response code: `200`, `400`, `401`, `404`
 ---
 ### Tournament group:
 **:id** is tournament id
